@@ -1,0 +1,65 @@
+{{- range $key, $val := .Values }}
+{{- if kindIs "map" $val }}
+{{- if and $val.enabled (or $val.deployment $val.image) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meta.fullname" $ }}-{{ $key }}
+  labels:
+    {{- include "meta.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $key }}
+spec:
+  {{- if $val.deployment }}
+  replicas: {{ $val.deployment.replicaCount | default 1 }}
+  {{- else }}
+  replicas: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "meta.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $key }}
+  template:
+    metadata:
+      labels:
+        {{- include "meta.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $key }}
+    spec:
+      {{- if not $val.skipImagePullSecrets }}
+      {{- if $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range $.Values.global.imagePullSecrets }}
+        - name: {{ .name | default . }}
+        {{- end }}
+      {{- else if $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range $.Values.imagePullSecrets }}
+        - name: {{ .name | default . }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ $key }}
+          image: "{{ $val.image.repository }}:{{ $val.image.tag | default $.Chart.AppVersion | default "latest" }}"
+          imagePullPolicy: {{ $val.image.pullPolicy | default "IfNotPresent" }}
+          {{- if $val.service }}
+          ports:
+            - name: http
+              containerPort: {{ $val.service.targetPort | default $val.service.port | default 80 }}
+              protocol: TCP
+          {{- end }}
+          {{- if and $val.deployment $val.deployment.resources }}
+          resources:
+            {{- toYaml $val.deployment.resources | nindent 12 }}
+          {{- else }}
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
