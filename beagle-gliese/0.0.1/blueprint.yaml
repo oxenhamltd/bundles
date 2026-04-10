@@ -1,0 +1,43 @@
+apiVersion: suse.ai/v1alpha1
+kind: Blueprint
+metadata:
+  name: "beagle-gliese"
+  labels:
+    catalog.suse.ai/support: "opensource"
+    catalog.suse.ai/tier: "certified"
+    catalog.suse.ai/certified: "false"
+    catalog.suse.ai/status: "new"
+  mantainer: "alessandro.festa1@suse.com"
+  source: "https://github.com/oxenhamltd/bundles"
+spec:
+  displayName: "beagle-gliese"
+  description: ""
+  category: "Inference"
+  source:
+    git:
+      url: "https://github.com/oxenhamltd/bundles"
+      ref: "main"
+      path: "beagle-gliese/0.0.1/chart"
+  modules:
+    - moduleRef: "ollama"
+      displayName: "Ollama"
+      description: "Get up and running with Llama 3.2, Mistral, Gemma 2, and other large language models."
+      category: "inference"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/ollama"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "beagle-gliese"
+    - moduleRef: "vlm"
+      displayName: "vlm"
+      description: ""
+      category: "custom-container"
+      support: "Open Source"
+      source:
+        helm:
+          url: "custom"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "beagle-gliese"
