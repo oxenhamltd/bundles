@@ -1,0 +1,16 @@
+apiVersion: v2
+name: "traffic-analysis"
+description: "First draft: Ollama (moondream:1.8b) + our simple web app"
+version: "0.0.1"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "traffic-analysis"
+  blueprint.suse.ai/version: "0.0.1"
+  blueprint.suse.ai/last-edit: "2026-04-10T15:35:24Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
