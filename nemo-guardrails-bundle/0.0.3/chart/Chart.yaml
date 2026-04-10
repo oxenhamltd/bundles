@@ -1,0 +1,24 @@
+apiVersion: v2
+name: "nemo-guardrails-bundle"
+description: "Custom bundle starting with nemo-guardrails"
+version: "0.0.3"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "nemo-guardrails-bundle"
+  blueprint.suse.ai/version: "0.0.3"
+  blueprint.suse.ai/last-edit: "2026-04-10T08:18:37Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "apache-airflow"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: apache-airflow.enabled
+  - name: "nim-llm"
+    version: "1.15.5"
+    repository: "https://helm.ngc.nvidia.com/nim"
+    condition: nemo-guardrails.enabled
+  - name: "open-webui"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: open-webui.enabled
