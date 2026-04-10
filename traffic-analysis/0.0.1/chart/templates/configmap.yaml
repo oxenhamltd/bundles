@@ -1,0 +1,15 @@
+{{- range $key, $val := .Values }}
+{{- if and (kindIs "map" $val) $val.enabled $val.config }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meta.fullname" $ }}-{{ $key }}
+  labels:
+    {{- include "meta.labels" $ | nindent 4 }}
+data:
+  {{- range $cKey, $cVal := $val.config }}
+  {{ $cKey }}: {{ $cVal | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}
