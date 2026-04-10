@@ -1,0 +1,43 @@
+apiVersion: suse.ai/v1alpha1
+kind: Blueprint
+metadata:
+  name: "traffic-analysis"
+  labels:
+    catalog.suse.ai/support: "opensource"
+    catalog.suse.ai/tier: "certified"
+    catalog.suse.ai/certified: "false"
+    catalog.suse.ai/status: "new"
+  mantainer: "alessandro.festa1@suse.com"
+  source: "https://github.com/oxenhamltd/bundles"
+spec:
+  displayName: "traffic-analysis"
+  description: "This first prototype use moondream that is not the best on our clusters we should attempt to use an NVIDIA optimized model..."
+  category: "Inference"
+  source:
+    git:
+      url: "https://github.com/oxenhamltd/bundles"
+      ref: "main"
+      path: "traffic-analysis/0.0.1/chart"
+  modules:
+    - moduleRef: "ollama"
+      displayName: "Ollama"
+      description: "Get up and running with Llama 3.2, Mistral, Gemma 2, and other large language models."
+      category: "inference"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/ollama"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "traffic-analysis"
+    - moduleRef: "vlm"
+      displayName: "vlm"
+      description: ""
+      category: "custom-container"
+      support: "Open Source"
+      source:
+        helm:
+          url: "custom"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "traffic-analysis"
