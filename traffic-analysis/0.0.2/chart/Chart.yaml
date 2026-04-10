@@ -1,0 +1,16 @@
+apiVersion: v2
+name: "traffic-analysis"
+description: "This first prototype use moondream that is not the best on our clusters we should attempt to use an NVIDIA optimized model..."
+version: "0.0.2"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "traffic-analysis"
+  blueprint.suse.ai/version: "0.0.2"
+  blueprint.suse.ai/last-edit: "2026-04-10T11:28:18Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
