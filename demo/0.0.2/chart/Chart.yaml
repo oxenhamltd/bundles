@@ -1,0 +1,24 @@
+apiVersion: v2
+name: "demo"
+description: "a simple demo"
+version: "0.0.2"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "demo"
+  blueprint.suse.ai/version: "0.0.2"
+  blueprint.suse.ai/last-edit: "2026-04-14T16:36:01Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "milvus"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: milvus.enabled
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
+  - name: "open-webui"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: open-webui.enabled

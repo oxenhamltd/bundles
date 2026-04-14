@@ -1,0 +1,24 @@
+{{- range $key, $val := .Values }}
+{{- if kindIs "map" $val }}
+{{- if and $val.enabled $val.service }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meta.fullname" $ }}-{{ $key }}
+  labels:
+    {{- include "meta.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $key }}
+spec:
+  type: {{ $val.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ $val.service.port | default 80 }}
+      targetPort: {{ $val.service.targetPort | default 80 }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "meta.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $key }}
+{{- end }}
+{{- end }}
+{{- end }}
