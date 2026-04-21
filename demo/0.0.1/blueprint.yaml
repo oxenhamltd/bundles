@@ -11,7 +11,7 @@ metadata:
   source: "https://github.com/oxenhamltd/bundles"
 spec:
   displayName: "demo"
-  description: "a simple demo"
+  description: ""
   category: "Inference"
   source:
     git:
@@ -19,36 +19,25 @@ spec:
       ref: "main"
       path: "demo/0.0.1/chart"
   modules:
-    - moduleRef: "milvus"
-      displayName: "Milvus"
-      description: "Milvus is a high-performance vector database built for scale. It is used by AI applications to organize and search through large amount of unstructured data, such as text, images, and multi-modal information."
+    - moduleRef: "apache-airflow"
+      displayName: "Apache Airflow"
+      description: "Apache Airflow is an open-source platform for programmatically authoring, scheduling, and monitoring complex workflows, primarily used for data pipelines, but also for other automated tasks like infrastructure management."
       category: "dataIngestion"
       support: "SUSE"
       source:
         helm:
-          url: "oci://dp.apps.rancher.io/charts/milvus"
+          url: "oci://dp.apps.rancher.io/charts/apache-airflow"
           ref: ">0.0.0-0"
           path: ""
       targetNamespace: "demo"
-    - moduleRef: "ollama"
-      displayName: "Ollama"
-      description: "Get up and running with Llama 3.2, Mistral, Gemma 2, and other large language models."
+    - moduleRef: "abacusai-dracarys-llama-3.1-70b-instruct"
+      displayName: ""
+      description: "Inference model: abacusai/dracarys-llama-3.1-70b-instruct"
       category: "inference"
-      support: "SUSE"
+      support: "NVIDIA"
       source:
         helm:
-          url: "oci://dp.apps.rancher.io/charts/ollama"
-          ref: ">0.0.0-0"
-          path: ""
-      targetNamespace: "demo"
-    - moduleRef: "open-webui"
-      displayName: "Open WebUI"
-      description: "Open WebUI is an extensible, feature-rich, and user-friendly self-hosted WebUI designed to operate entirely offline. It supports various LLM runners, including Ollama and OpenAI-compatible APIs."
-      category: "applicationUI"
-      support: "SUSE"
-      source:
-        helm:
-          url: "oci://dp.apps.rancher.io/charts/open-webui"
+          url: "https://helm.ngc.nvidia.com/nim/charts/nim-llm-1.15.5.tgz"
           ref: ">0.0.0-0"
           path: ""
       targetNamespace: "demo"
