@@ -19,3 +19,21 @@ spec:
       ref: "main"
       path: "suse-ai-genai/1.2.0/chart"
   modules:
+    - moduleRef: "apache-airflow"
+      displayName: "Apache Airflow"
+      description: "Apache Airflow is an open-source platform for programmatically authoring, scheduling, and monitoring complex workflows, primarily used for data pipelines, but also for other automated tasks like infrastructure management."
+      category: "dataIngestion"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/apache-airflow"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "suse-ai-genai"
+      dependsOn:
+        - "milvus"
+        - "ollama"
+        - "open-webui"
+        - "pytorch"
+        - "vllm"
+        - "open-webui-mcpo"
