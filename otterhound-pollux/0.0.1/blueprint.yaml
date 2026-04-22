@@ -1,0 +1,43 @@
+apiVersion: suse.ai/v1alpha1
+kind: Blueprint
+metadata:
+  name: "otterhound-pollux"
+  labels:
+    catalog.suse.ai/support: "opensource"
+    catalog.suse.ai/tier: "certified"
+    catalog.suse.ai/certified: "false"
+    catalog.suse.ai/status: "new"
+  mantainer: "alessandro.festa1@suse.com"
+  source: "https://github.com/oxenhamltd/bundles"
+spec:
+  displayName: "otterhound-pollux"
+  description: ""
+  category: "Inference"
+  source:
+    git:
+      url: "https://github.com/oxenhamltd/bundles"
+      ref: "main"
+      path: "otterhound-pollux/0.0.1/chart"
+  modules:
+    - moduleRef: "postgresql"
+      displayName: "PostgreSQL"
+      description: "PostgreSQL is an advanced object-relational database management system that supports an extended subset of the SQL standard, including transactions, foreign keys, subqueries, triggers, user-defined types and functions."
+      category: "dataIngestion"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/postgresql"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "otterhound-pollux"
+    - moduleRef: "pytorch"
+      displayName: "PyTorch"
+      description: "PyTorch is a machine learning library based on the Torch library, used for applications such as computer vision and natural language processing"
+      category: "modelTraining"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/pytorch"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "otterhound-pollux"
