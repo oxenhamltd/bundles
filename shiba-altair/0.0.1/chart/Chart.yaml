@@ -1,0 +1,20 @@
+apiVersion: v2
+name: "shiba-altair"
+description: ""
+version: "0.0.1"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "shiba-altair"
+  blueprint.suse.ai/version: "0.0.1"
+  blueprint.suse.ai/last-edit: "2026-04-22T08:31:22Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "apache-airflow"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: apache-airflow.enabled
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
