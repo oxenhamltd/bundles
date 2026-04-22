@@ -1,0 +1,38 @@
+# Aggregated values.yaml
+
+# Aggregated Stack Configuration
+# Global configurations for image pull secrets
+global:
+  imagePullSecrets:
+    - name: application-collection
+    - name: nvidia-ngc-secret
+
+imagePullSecrets:
+  - name: application-collection
+  - name: nvidia-ngc-secret
+
+
+
+# =============================================================================
+# --- Custom Container: vlm ---
+# =============================================================================
+vlm:
+  enabled: true
+  skipImagePullSecrets: true
+  deployment:
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+  image:
+    repository: ghcr.io/nvidia-ai-iot/live-vlm-webui
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: 8090
+    targetPort: 8090
