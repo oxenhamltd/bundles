@@ -1,0 +1,24 @@
+apiVersion: v2
+name: "suse-demo"
+description: "A simple description"
+version: "0.0.2"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "suse-demo"
+  blueprint.suse.ai/version: "0.0.2"
+  blueprint.suse.ai/last-edit: "2026-05-05T06:52:28Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "milvus"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: milvus.enabled
+  - name: "nim-llm"
+    version: "1.15.5"
+    repository: "https://helm.ngc.nvidia.com/nim"
+    condition: google-gemma-2-2b-it.enabled
+  - name: "open-webui"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: open-webui.enabled
