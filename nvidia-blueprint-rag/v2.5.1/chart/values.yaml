@@ -1,0 +1,2706 @@
+# Aggregated values.yaml
+
+# Aggregated Stack Configuration
+# Global configurations for image pull secrets
+global:
+  imagePullSecrets:
+    - name: application-collection
+    - name: nvidia-ngc-secret
+
+imagePullSecrets:
+  - name: application-collection
+  - name: nvidia-ngc-secret
+
+
+
+# =============================================================================
+# --- nvidia-blueprint-rag ---
+# =============================================================================
+nvidia-blueprint-rag:
+  # -- Global chart configuration
+  nameOverride: ""
+  fullnameOverride: "rag-server"
+  # subsection: rag-server
+  # RAG Orchestrator Service
+  # -- Kubernetes scheduling
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+
+  # -- Common service account for rag-server
+  serviceAccount:
+    create: true
+    name: ""
+    automount: true
+    annotations: {}
+
+  # -- Replicas for rag-server
+  replicaCount: 1
+
+  # -- Namespace for documentation/reference; not actively used in templates
+  namespace: "nv-nvidia-blueprint-rag"
+
+  # -- Image pull secret for all images used by this chart
+  imagePullSecret:
+    name: "ngc-secret"
+    registry: "nvcr.io"
+    username: "$oauthtoken"
+    password: ""
+    create: true
+
+  # -- Secret containing API keys for NVIDIA NGC model registry
+  ngcApiSecret:
+    name: "ngc-api"
+    password: ""
+    create: true
+
+  # -- Secret containing service-specific API keys for RAG services
+  apiKeysSecret:
+    # -- Enable automatic secret creation from values below
+    create: true
+    # -- Name of the secret to create or reference
+    name: "rag-api-keys"
+    # -- Reference to existing secret (if set, chart won't create secret, will reference this instead)
+    existingSecret: ""
+    # -- Service-specific API keys (optional, empty means use NVIDIA_API_KEY fallback)
+    # Note: Non-empty values act as enable flags - only non-empty keys are injected as env vars
+    llmApiKey: ""
+    embeddingsApiKey: ""
+    rankingApiKey: ""
+    queryRewriterApiKey: ""
+    filterExpressionGeneratorApiKey: ""
+    vlmApiKey: ""
+    summaryLlmApiKey: ""
+    reflectionLlmApiKey: ""
+
+  # -- RAG server container image
+  image:
+    repository: nvcr.io/nvidia/blueprint/rag-server
+    tag: "2.5.0"
+    pullPolicy: Always
+
+  # -- RAG server service configuration
+  service:
+    type: ClusterIP
+    port: 8081
+
+  # -- RAG server container resources
+  resources:
+    limits:
+      memory: "64Gi"
+    requests:
+      memory: "8Gi"
+
+  # -- Probes for rag-server (optional)
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # -- RAG server runtime configuration
+  server:
+    workers: 8
+
+  # -- Enable/disable creation of prompt ConfigMap
+  promptConfig:
+    enabled: true
+
+  # -- Environment variables for rag-server
+  envVars:
+    EXAMPLE_PATH: "./nvidia_rag/rag_server"
+    PROMPT_CONFIG_FILE: "/prompt.yaml"
+    PROMETHEUS_MULTIPROC_DIR: "/tmp-data/prom_data"
+
+    ##===Authentication===
+    ## Service-specific API keys are now managed via apiKeysSecret section above.
+    ## See apiKeysSecret configuration for details on setting service-specific keys.
+
+    ##===MINIO specific configurations used to store multimodal base64 content===
+    MINIO_ENDPOINT: "rag-minio:9000"
+    MINIO_ACCESSKEY: "minioadmin"
+    MINIO_SECRETKEY: "minioadmin"
+
+    ##===Redis configurations for summary status tracking===
+    REDIS_HOST: "rag-redis-master"
+    REDIS_PORT: "6379"
+    REDIS_DB: "0"
+
+    ##===Vector DB specific configurations===
+    # URL on which vectorstore is hosted
+    APP_VECTORSTORE_URL: "http://milvus:19530" # Use "http://rag-eck-elasticsearch-es-http:9200" for elasticsearch
+    # Type of vectordb used to store embedding supported type "milvus" or "elasticsearch"
+    APP_VECTORSTORE_NAME: "milvus"
+    # Index type (e.g., GPU_CAGRA)
+    APP_VECTORSTORE_INDEXTYPE: "GPU_CAGRA"
+    # Type of vectordb search to be used
+    APP_VECTORSTORE_SEARCHTYPE: "dense"
+    # Type of ranker to use for vector store in case of Hybrid Search
+    APP_VECTORSTORE_RANKER_TYPE: "rrf" # Can be "rrf" or "weighted"
+    # Weight for dense vector search in case of "weighted" Hybrid Search
+    APP_VECTORSTORE_DENSE_WEIGHT: "0.5"
+    # Weight for sparse vector search in case of "weighted" Hybrid Search
+    APP_VECTORSTORE_SPARSE_WEIGHT: "0.5"
+    # Boolean to control GPU search for milvus vectorstore specific to rag-server
+    APP_VECTORSTORE_ENABLEGPUSEARCH: "True"
+    # ef: Parameter controlling query time/accuracy trade-off. Higher ef leads to more accurate but slower search.
+    APP_VECTORSTORE_EF: "100"
+    # Username for vector store authentication
+    APP_VECTORSTORE_USERNAME: ""
+    # Password for vector store authentication
+    APP_VECTORSTORE_PASSWORD: ""
+    # Elasticsearch API key auth (optional). Prefer these over username/password when set.
+    # Provide either base64 APP_VECTORSTORE_APIKEY or split ID/SECRET.
+    APP_VECTORSTORE_APIKEY_ID: ""
+    APP_VECTORSTORE_APIKEY_SECRET: ""
+    APP_VECTORSTORE_APIKEY: ""
+
+    # vectorstore collection name to store embeddings
+    COLLECTION_NAME: "multimodal_data"
+    APP_RETRIEVER_SCORETHRESHOLD: "0.25"
+    # Top K from vector DB, which goes as input to reranker model - not applicable if ENABLE_RERANKER is set to False
+    VECTOR_DB_TOPK: "100"
+    # Number of document chunks to insert in LLM prompt
+    APP_RETRIEVER_TOPK: "10"
+
+    ##===LLM Model specific configurations===
+    APP_LLM_MODELNAME: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    # URL on which LLM model is hosted. If "", Nvidia hosted API is used
+    APP_LLM_SERVERURL: "nim-llm:8000"
+    # LLM model parameters
+    # For Nemotron 3 Super on RTX 6000 Pro: uncomment and set to 16256 (reasoning) or 1024 (non-reasoning); comment LLM_MAX_TOKENS above
+    LLM_MAX_TOKENS: "32768" # "16256"
+    LLM_TEMPERATURE: "0"
+    LLM_TOP_P: "1.0"
+
+    ##===Query Rewriter Model specific configurations===
+    APP_QUERYREWRITER_MODELNAME: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    # URL on which query rewriter model is hosted. If "", Nvidia hosted API is used
+    APP_QUERYREWRITER_SERVERURL: "nim-llm:8000"
+
+    ##===Filter Expression Generator Model specific configurations===
+    APP_FILTEREXPRESSIONGENERATOR_MODELNAME: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    # URL on which filter expression generator model is hosted. If "", Nvidia hosted API is used
+    APP_FILTEREXPRESSIONGENERATOR_SERVERURL: "nim-llm:8000"
+    # enable filter expression generator for natural language to filter expression conversion
+    ENABLE_FILTER_GENERATOR: "False"
+
+    ##===Embedding Model specific configurations===
+    # URL on which embedding model is hosted. If "", Nvidia hosted API is used
+    APP_EMBEDDINGS_SERVERURL: "nemotron-embedding-ms:8000/v1"
+    APP_EMBEDDINGS_MODELNAME: "nvidia/llama-nemotron-embed-1b-v2"
+    APP_EMBEDDINGS_DIMENSIONS: "2048"
+
+    ##===Reranking Model specific configurations===
+    # URL on which ranking model is hosted. If "", Nvidia hosted API is used
+    APP_RANKING_SERVERURL: "nemotron-ranking-ms:8000"
+    APP_RANKING_MODELNAME: "nvidia/llama-nemotron-rerank-1b-v2"
+    ENABLE_RERANKER: "True"
+    # Default score threshold for filtering documents by reranker relevance (0.0 to 1.0)
+    RERANKER_SCORE_THRESHOLD: "0.0"
+
+    ##===VLM Model specific configurations===
+    ENABLE_VLM_INFERENCE: "false"
+    # When true, allow falling back to LLM flow if no images are present in query/messages/context.
+    # When false, always route generation through VLM when ENABLE_VLM_INFERENCE is true.
+    VLM_TO_LLM_FALLBACK: "true"
+    # Max images sent to VLM per request (query + context)
+    APP_VLM_MAX_TOTAL_IMAGES: "5"
+    # VLM generation parameters
+    APP_VLM_MAX_TOKENS: "8192"
+    APP_VLM_TEMPERATURE: "0.1"
+    APP_VLM_TOP_P: "1.0"
+    # VLM server URL
+    APP_VLM_SERVERURL: "http://nim-vlm:8000/v1"
+    # VLM model name
+    APP_VLM_MODELNAME: "nvidia/nemotron-nano-12b-v2-vl"
+
+    # === Text Splitter ===
+    APP_TEXTSPLITTER_CHUNKSIZE: "2000"
+    APP_TEXTSPLITTER_CHUNKOVERLAP: "200"
+
+    # === General ===
+    # Choose whether to enable citations in the response
+    ENABLE_CITATIONS: "True"
+    # Choose whether to enable/disable guardrails
+    ENABLE_GUARDRAILS: "False"
+    # Log level for server, supported level NOTSET, DEBUG, INFO, WARN, ERROR, CRITICAL
+    LOGLEVEL: "INFO"
+    # enable multi-turn conversation in the rag chain - this controls conversation history usage
+    # while doing query rewriting and in LLM prompt
+    ENABLE_MULTITURN: "True"
+    # enable query rewriting for multiturn conversation in the rag chain.
+    # This will improve accuracy of the retrieiver pipeline but increase latency due to an additional LLM call
+    ENABLE_QUERYREWRITER: "False"
+    # enable concatenating conversation history with current query for retrieval (when query rewriter is disabled)
+    MULTITURN_RETRIEVER_SIMPLE: "False"
+    # number of last n chat messages to consider from the provided conversation history (0 = no history)
+    CONVERSATION_HISTORY: "0"
+
+    # === Tracing ===
+    APP_TRACING_ENABLED: "False"
+    # HTTP endpoint
+    APP_TRACING_OTLPHTTPENDPOINT: "http://rag-opentelemetry-collector:4318/v1/traces"
+    # GRPC endpoint
+    APP_TRACING_OTLPGRPCENDPOINT: "grpc://rag-opentelemetry-collector:4317"
+
+    # === Reflection ===
+    # enable reflection (context relevance and response groundedness checking) in the rag chain
+    ENABLE_REFLECTION: "false"
+    # Maximum number of context relevance loop iterations
+    MAX_REFLECTION_LOOP: "3"
+    # Minimum relevance score threshold (0-2)
+    CONTEXT_RELEVANCE_THRESHOLD: "1"
+    # Minimum groundedness score threshold (0-2)
+    RESPONSE_GROUNDEDNESS_THRESHOLD: "1"
+    # reflection llm
+    REFLECTION_LLM: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    # reflection llm server url. If "", Nvidia hosted API is used
+    REFLECTION_LLM_SERVERURL: "nim-llm:8000"
+
+    # Choose whether to enable source metadata in document content during generation
+    ENABLE_SOURCE_METADATA: "true"
+
+    # Whether to filter content within <think></think> tags in model responses
+    FILTER_THINK_TOKENS: "true"
+
+    # Reasoning configuration (supported by Nemotron 3 and other reasoning models)
+    LLM_ENABLE_THINKING: "false"
+    LLM_REASONING_BUDGET: "0"
+    LLM_LOW_EFFORT: "false"
+
+    NEMO_GUARDRAILS_URL: "nemo-guardrails:7331"
+
+    # enable iterative query decomposition
+    ENABLE_QUERY_DECOMPOSITION: "false"
+    # maximum recursion depth for iterative query decomposition
+    MAX_RECURSION_DEPTH: "3"
+
+  # -- Ingestor Server
+  # subsection: ingestor-server
+  # Ingestor API Service
+  ingestor-server:
+    enabled: true
+    appName: ingestor-server
+
+    # -- Pod scheduling
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+
+    replicaCount: 1
+
+    imagePullSecret:
+      create: false
+      name: "ngc-secret"
+      registry: "nvcr.io"
+      username: "$oauthtoken"
+      password: ""
+
+    image:
+      repository: nvcr.io/nvidia/blueprint/ingestor-server
+      tag: "2.5.0"
+      pullPolicy: Always
+
+    # -- Service config for ingestor-server
+    service:
+      type: ClusterIP
+      port: 8082
+
+    server:
+      workers: 1
+
+    # -- Probes for ingestor-server (optional)
+    livenessProbe: {}
+    readinessProbe: {}
+
+    resources:
+      limits:
+        memory: "25Gi"
+      requests:
+        memory: "25Gi"
+
+    envVars:
+      # Path to example directory relative to repo root
+      EXAMPLE_PATH: "src/nvidia_rag/ingestor_server"
+      # Absolute path to custom prompt.yaml file
+      PROMPT_CONFIG_FILE: "/prompt.yaml"
+      # === Vector Store Configurations ===
+      APP_VECTORSTORE_URL: "http://milvus:19530" # Use "http://rag-eck-elasticsearch-es-http:9200" for elasticsearch
+      APP_VECTORSTORE_NAME: "milvus" # supported values: "milvus" or "elasticsearch"
+      APP_VECTORSTORE_SEARCHTYPE: "dense"
+      # Type of ranker to use for vector store in case of Hybrid Search
+      APP_VECTORSTORE_RANKER_TYPE: "rrf" # Can be "rrf" or "weighted"
+      # Weight for dense vector search in case of "weighted" Hybrid Search
+      APP_VECTORSTORE_DENSE_WEIGHT: "0.5"
+      # Weight for sparse vector search in case of "weighted" Hybrid Search
+      APP_VECTORSTORE_SPARSE_WEIGHT: "0.5"
+      APP_VECTORSTORE_ENABLEGPUINDEX: "True"
+      APP_VECTORSTORE_ENABLEGPUSEARCH: "True"
+      # Username  for vector store authentication
+      APP_VECTORSTORE_USERNAME: ""
+      # Password for vector store authentication
+      APP_VECTORSTORE_PASSWORD: ""
+      # Elasticsearch API key auth (optional). Prefer these over username/password when set.
+      # Provide either base64 APP_VECTORSTORE_APIKEY or split ID/SECRET.
+      APP_VECTORSTORE_APIKEY_ID: ""
+      APP_VECTORSTORE_APIKEY_SECRET: ""
+      APP_VECTORSTORE_APIKEY: ""
+      COLLECTION_NAME: "multimodal_data"
+
+      # === MinIO Configurations ===
+      MINIO_ENDPOINT: "rag-minio:9000"
+      MINIO_ACCESSKEY: "minioadmin"
+      MINIO_SECRETKEY: "minioadmin"
+
+      # === Authentication ===
+      ## Service-specific API keys are managed via apiKeysSecret section (see top-level config).
+      ## APP_EMBEDDINGS_APIKEY and SUMMARY_LLM_APIKEY are loaded from secrets automatically.
+
+      # === Embeddings Configurations ===
+      APP_EMBEDDINGS_SERVERURL: "nemotron-embedding-ms:8000/v1"
+      APP_EMBEDDINGS_MODELNAME: "nvidia/llama-nemotron-embed-1b-v2"
+      APP_EMBEDDINGS_DIMENSIONS: "2048"
+
+      # === NV-Ingest Configurations ===
+      APP_NVINGEST_MESSAGECLIENTHOSTNAME: "rag-nv-ingest"
+      APP_NVINGEST_MESSAGECLIENTPORT: "7670"
+
+      # === NV-Ingest extraction configurations ===
+      APP_NVINGEST_PDFEXTRACTMETHOD: "None"  # Method used for text extraction from "None", "pdfium", "nemotron_parse"
+      APP_NVINGEST_EXTRACTTABLESMETHOD: "yolox"  # Method for table extraction: "yolox", "nemotron_parse", or None
+      APP_NVINGEST_EXTRACTTEXT: "True"  # Enable text extraction
+      APP_NVINGEST_EXTRACTINFOGRAPHICS: "False"  # Enable infographic extraction
+      APP_NVINGEST_EXTRACTTABLES: "True"  # Enable table extraction
+      APP_NVINGEST_EXTRACTCHARTS: "True"  # Enable chart extraction
+      APP_NVINGEST_EXTRACTIMAGES: "False"  # Enable image extraction
+      APP_NVINGEST_EXTRACTPAGEASIMAGE: "False"  # Extracts each page as image if enabled
+      APP_NVINGEST_STRUCTURED_ELEMENTS_MODALITY: ""  # "image", "text_image"
+      APP_NVINGEST_IMAGE_ELEMENTS_MODALITY: ""  # "image"
+      APP_NVINGEST_TEXTDEPTH: "page"  # Extract text by "page" or "document"
+
+      # === NV-Ingest caption configurations ===
+      APP_NVINGEST_CAPTIONMODELNAME: "nvidia/nemotron-nano-12b-v2-vl"  # Model name for captioning
+      APP_NVINGEST_CAPTIONENDPOINTURL: ""  # Endpoint URL for captioning model
+
+      # === NV-Ingest save to disk configurations ===
+      APP_NVINGEST_SAVETODISK: "False"
+      NVINGEST_MINIO_BUCKET: "nv-ingest" # If this value is modified, ensure the corresponding Milvus bucketName is also updated
+
+      # === NV-Ingest performance configurations ===
+      APP_NVINGEST_ENABLE_PDF_SPLIT_PROCESSING: "False"
+      APP_NVINGEST_PAGES_PER_CHUNK: "16"
+
+      # === General ===
+      # Summary Model Configurations
+      SUMMARY_LLM: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+      SUMMARY_LLM_SERVERURL: "nim-llm:8000"
+      SUMMARY_LLM_MAX_CHUNK_LENGTH: "9000"
+      SUMMARY_CHUNK_OVERLAP: "400"
+      SUMMARY_LLM_TEMPERATURE: "0.0"
+      SUMMARY_LLM_TOP_P: "1.0"
+      SUMMARY_MAX_PARALLELIZATION: "20"
+
+      # === General ===
+      ENABLE_CITATIONS: "True"
+      LOGLEVEL: "INFO"
+
+      # === NV-Ingest splitting configurations ===
+      APP_NVINGEST_CHUNKSIZE: "512"  # Size of chunks for splitting
+      APP_NVINGEST_CHUNKOVERLAP: "150"  # Overlap size for chunks
+      APP_NVINGEST_ENABLEPDFSPLITTER: "True"  # Enable PDF splitter
+      APP_NVINGEST_SEGMENTAUDIO: "False"  # Enable audio segmentation for NV Ingest
+
+      # === Redis configurations ===
+      REDIS_HOST: "rag-redis-master"
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      ENABLE_REDIS_BACKEND: "False"
+
+      # === Bulk upload to MinIO ===
+      ENABLE_MINIO_BULK_UPLOAD: "True"
+      TEMP_DIR: "/tmp-data"
+      INGESTOR_SERVER_DATA_DIR: "/data/"
+
+      # === NV-Ingest Batch Mode Configurations ===
+      NV_INGEST_FILES_PER_BATCH: "16"
+      NV_INGEST_CONCURRENT_BATCHES: "4"
+      ENABLE_NV_INGEST_DYNAMIC_BATCHING: "True"
+
+      # === Tracing ===
+      APP_TRACING_ENABLED: "False"
+      # HTTP endpoint
+      APP_TRACING_OTLPHTTPENDPOINT: "http://otel-collector:4318/v1/traces"
+      # GRPC endpoint
+      APP_TRACING_OTLPGRPCENDPOINT: "grpc://otel-collector:4317"
+
+    # -- Persistent storage for ingestor-server data directory
+    # If enabled, mounts a PVC at the path used by INGESTOR_SERVER_DATA_DIR
+    persistence:
+      enabled: true
+      # If set, use an existing PVC by name; when empty and enabled, a PVC is created
+      existingClaim: ""
+      # StorageClass to use for the PVC; keep empty to use the cluster default
+      storageClass: ""
+      # Access modes for the PVC
+      accessModes:
+        - ReadWriteOnce
+      # Requested size for the PVC
+      size: 50Gi
+      # Mount path inside the container; defaults to envVars.INGESTOR_SERVER_DATA_DIR if empty
+      mountPath: "/data/"
+      # Optional subPath within the PVC
+      subPath: ""
+
+  # -- Frontend
+  # subsection: frontend
+  # rag frontend Frontend
+  frontend:
+    enabled: true
+    appName: "rag-frontend"
+
+    replicaCount: 1
+
+    image:
+      repository: nvcr.io/nvidia/blueprint/rag-frontend
+      pullPolicy: IfNotPresent
+      tag: "2.5.0"
+
+    imagePullSecret:
+      name: "ngc-secret"
+      registry: "nvcr.io"
+      username: "$oauthtoken"
+      password: ""
+
+    service:
+      type: NodePort
+      port: 3000
+
+    # -- Probes for frontend (optional)
+    livenessProbe: {}
+    readinessProbe: {}
+
+    envVars:
+      # Runtime environment variables for Vite frontend
+      # Note: Model names are now managed by frontend settings store
+      - name: VITE_API_CHAT_URL
+        value: "http://rag-server:8081/v1"
+      - name: VITE_API_VDB_URL
+        value: "http://ingestor-server:8082/v1"
+      - name: VITE_MILVUS_URL
+        value: "http://milvus:19530"
+
+  # -- Elasticsearch dependency toggle
+  eck-elasticsearch:
+    enabled: false
+    http:
+      tls:
+        selfSignedCertificate:
+          disabled: true
+    nodeSets:
+    - name: default
+      count: 1
+      config:
+        node.store.allow_mmap: false
+        xpack.security.enabled: false
+        xpack.security.http.ssl.enabled: false
+        xpack.security.transport.ssl.enabled: false
+      podTemplate:
+        spec:
+          containers:
+          - name: elasticsearch
+            # Override readiness probe to not require authentication
+            readinessProbe:
+              exec:
+                command:
+                - bash
+                - -c
+                - |
+                  curl -s http://localhost:9200/_cluster/health | grep -q '"status":"green"\|"status":"yellow"'
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 3
+
+  # -- Observability
+  # subsection: serviceMonitor
+  serviceMonitor:
+    enabled: false
+
+  # subsection: opentelemetry-collector
+  opentelemetry-collector:
+    enabled: false
+    mode: deployment
+    image:
+      repository: docker.io/otel/opentelemetry-collector-contrib
+      tag: "0.140.0"
+    command:
+      name: otelcol-contrib
+    config:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: '${env:MY_POD_IP}:4317'
+            http:
+              cors:
+                allowed_origins:
+                  - "*"
+      exporters:
+        # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
+        zipkin:
+          endpoint: "http://rag-zipkin:9411/api/v2/spans"
+        debug:
+          verbosity: detailed
+        prometheus:
+          endpoint: ${env:MY_POD_IP}:8889
+      extensions:
+        health_check: {}
+        zpages:
+          endpoint: 0.0.0.0:55679
+      processors:
+        batch: {}
+        tail_sampling:
+          # filter out health checks
+          # https://github.com/open-telemetry/opentelemetry-collector/issues/2310#issuecomment-1268157484
+          policies:
+            - name: drop_noisy_traces_url
+              type: string_attribute
+              string_attribute:
+                key: http.target
+                values:
+                  - \/health
+                enabled_regex_matching: true
+                invert_match: true
+        transform:
+          trace_statements:
+            - context: span
+              statements:
+                - set(status.code, 1) where attributes["http.path"] == "/health"
+
+                # after the http target has been anonymized, replace other aspects of the span
+                - replace_match(attributes["http.route"], "/v1", attributes["http.target"]) where attributes["http.target"] != nil
+
+                # replace the title of the span with the route to be more descriptive
+                - replace_pattern(name, "/v1", attributes["http.route"]) where attributes["http.route"] != nil
+
+                # set the route to equal the URL if it's nondescriptive (for the embedding case)
+                - set(name, Concat([name, attributes["http.url"]], " ")) where name == "POST"
+      service:
+        extensions: [zpages, health_check]
+        pipelines:
+          traces:
+            receivers: [otlp]
+            exporters: [debug, zipkin]
+            processors: [tail_sampling, transform]
+          metrics:
+            exporters:
+              - debug
+              - prometheus
+            processors:
+              - memory_limiter
+              - batch
+            receivers:
+              - otlp
+              - prometheus
+          logs:
+            receivers: [otlp]
+            exporters: [debug]
+            processors: [batch]
+    ports:
+      metrics:
+        enabled: true
+        containerPort: 8889
+        servicePort: 8889
+        protocol: TCP
+
+  # subsection: zipkin
+  zipkin:
+    enabled: false
+    image:
+      repository: docker.io/openzipkin/zipkin
+      tag: 3.5.0
+
+  # subsection: kube-prometheus-stack
+  kube-prometheus-stack:
+    enabled: false
+    prometheus-node-exporter:
+      service:
+        port: 9100
+        targetPort: 9100
+      hostNetwork: false
+    prometheus:
+      serviceMonitor:
+        interval: "1s"
+      prometheusSpec:
+        scrapeInterval: "1s"
+        evaluationInterval: "1s"
+        additionalScrapeConfigs:
+          - job_name: rag-app
+            scrape_interval: 5s
+            metrics_path: /metrics
+            static_configs:
+              - targets:
+                  # If the app is in another namespace, use rag-server.<namespace>.svc:8081
+                  - rag-server:8081
+    grafana:
+      adminUser: admin
+      adminPassword: "admin"
+    prometheusOperator:
+      crds:
+        enabled: false
+
+  # -- NIMs (dependencies) configuration
+  # subsection: nim-llm
+  # NIM LLM
+  nimOperator:       
+    draResources:
+      enabled: false
+      name: "rag-claim"
+      type: "TimeSlicing"
+    nim-llm:
+      enabled: true
+      replicas: 1
+      service:
+        name: "nim-llm"
+      image:
+        repository: nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
+        pullPolicy: IfNotPresent
+        tag: "1.14.0"
+  # -- For Nemotron 3 Super: uncomment the block below and comment the image block above
+  #    image:
+  #      repository: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b
+  #      pullPolicy: IfNotPresent
+  #      tag: "1.8.0"
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+        requests:
+          nvidia.com/gpu: 1
+  # -- For Nemotron 3 Super (all hardware): uncomment the block below and comment the resources block above
+  #    resources:
+  #      limits:
+  #        nvidia.com/gpu: 2
+  #      requests:
+  #        nvidia.com/gpu: 2
+      nodeSelector: {}
+      tolerations: []
+      model:
+        engine: tensorrt_llm
+  # -- Uncomment this section to enable FP8 precision and throughput profile for the NIM LLM, change the GPU product according to the GPU you are using
+  #      precision: "fp8"
+  #      qosProfile: "throughput"
+  #      tensorParallelism: "1"
+  #      gpus:
+  #        - product: "rtx6000_blackwell_sv"
+  # -- For Nemotron 3 Super (all hardware): comment "engine: tensorrt_llm" above and uncomment the three lines below
+  #      engine: vllm
+  #      precision: "fp8"
+  #      tensorParallelism: "2"
+      storage:
+        pvc:
+          create: true
+          size: "120Gi"
+          volumeAccessMode: ReadWriteOnce
+          storageClass: ""
+        sharedMemorySizeLimit: "16Gi"
+  #    draResources:
+  #      - claimCreationSpec:
+  #          devices:
+  #            - name: nimllm-gpu
+  #              count: 1
+  #              deviceClassName: gpu.nvidia.com
+  #              driverName: gpu.nvidia.com
+  #              attributeSelectors:
+  #                - key: driverVersion
+  #                  op: GreaterThanOrEqual
+  #                  value:
+  #                    versionValue: "550.127.8"
+  #              capacitySelectors:
+  #                - key: memory
+  #                  op: GreaterThanOrEqual
+  #                  value: 40Gi
+      env:
+        - name: NIM_HTTP_API_PORT
+          value: "8000"
+        - name: NIM_TRITON_LOG_VERBOSE
+          value: "1"
+        - name: NIM_SERVED_MODEL_NAME
+          value: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+        - name: NIM_MAX_MODEL_LEN
+          value: "131072"
+  # -- For Nemotron 3 Super on RTX 6000 Pro: comment the NIM_MAX_MODEL_LEN entry above and uncomment the block below
+  #      - name: NIM_MAX_MODEL_LEN
+  #        value: "32768"
+  #      - name: NCCL_P2P_DISABLE
+  #        value: "1"
+  #      - name: NIM_KVCACHE_PERCENT
+  #        value: "0.9"
+  #      - name: CUDA_VISIBLE_DEVICES
+  #        value: "0"
+      expose:
+        service:
+          name: http
+          type: ClusterIP
+          port: 8000
+          grpcPort: 8001
+      startupProbe:
+        enabled: true
+        probe:
+          httpGet:
+            path: /v1/health/ready
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          failureThreshold: 750
+          timeoutSeconds: 5
+
+  # subsection: nvidia-nim-llama-32-nv-embedqa-1b-v2
+  # NIM Text Embedding
+    nvidia-nim-llama-32-nv-embedqa-1b-v2:
+      enabled: true
+      replicas: 1
+      service:
+        name: "nemotron-embedding-ms"
+      image:
+        repository: nvcr.io/nim/nvidia/llama-nemotron-embed-1b-v2
+        tag: "1.13.0"
+        pullPolicy: IfNotPresent
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+        requests:
+          nvidia.com/gpu: 1
+      storage:
+        pvc:
+          create: true
+          size: "50Gi"
+          volumeAccessMode: ReadWriteOnce
+          storageClass: ""
+      nodeSelector: {}
+      tolerations: []
+  #    draResources:
+  #      - resourceClaimName: rag-claim
+      env:
+        - name: NIM_HTTP_API_PORT
+          value: "8000"
+        - name: NIM_TRITON_LOG_VERBOSE
+          value: "1"
+        - name: OMP_NUM_THREADS
+          value: "1"
+        - name: NIM_TRITON_PERFORMANCE_MODE
+          value: "throughput"
+      expose:
+        service:
+          name: http
+          type: ClusterIP
+          port: 8000
+          grpcPort: 8001
+
+  # subsection: nvidia-nim-llama-nemotron-embed-vl-1b-v2
+  # NIM VLM Embedding
+    nvidia-nim-llama-nemotron-embed-vl-1b-v2:
+      enabled: false
+      service:
+        name: "nemotron-vlm-embedding-ms"
+      image:
+        repository: nvcr.io/nim/nvidia/llama-nemotron-embed-vl-1b-v2
+        tag: "1.12.0"
+        pullPolicy: IfNotPresent
+      replicas: 1
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+        requests:
+          nvidia.com/gpu: 1
+      nodeSelector: {}
+      tolerations: []
+  #    draResources:
+  #      - resourceClaimName: rag-claim
+      storage:
+        pvc:
+          create: true
+          size: "50Gi"
+          volumeAccessMode: ReadWriteOnce
+          storageClass: ""
+      env:
+        - name: NIM_HTTP_API_PORT
+          value: "8000"
+        - name: NIM_TRITON_LOG_VERBOSE
+          value: "1"
+      expose:
+        service:
+          name: http
+          type: ClusterIP
+          port: 8000
+          grpcPort: 8001
+  # subsection: text-reranking-nim
+  # NIM Text Reranking
+    nvidia-nim-llama-32-nv-rerankqa-1b-v2:
+      enabled: true
+      replicas: 1
+      service:
+        name: "nemotron-ranking-ms"
+      image:
+        repository: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2
+        tag: "1.10.0"
+        pullPolicy: IfNotPresent
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+        requests:
+          nvidia.com/gpu: 1
+      nodeSelector: {}
+      tolerations: []
+  #    draResources:
+  #      - resourceClaimName: rag-claim
+      storage:
+        pvc:
+          create: true
+          size: "50Gi"
+          volumeAccessMode: ReadWriteOnce
+          storageClass: ""
+      env: []
+      expose:
+        service:
+          name: http
+          type: ClusterIP
+          port: 8000
+          grpcPort: 8001
+
+    # subsection: nim-vlm
+    # NIM Vision-Language (VLM)
+    nim-vlm:
+      enabled: false
+      replicas: 1
+      service:
+        name: "nim-vlm"
+      image:
+        repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
+        tag: "1.5.0"
+        pullPolicy: IfNotPresent
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+        requests:
+          nvidia.com/gpu: 1
+      nodeSelector: {}
+      tolerations: []
+  #    draResources:
+  #      - resourceClaimName: rag-claim
+      storage:
+        pvc:
+          create: true
+          size: "50Gi"
+          volumeAccessMode: ReadWriteOnce
+          storageClass: ""
+      env: []
+      expose:
+        service:
+          name: http
+          type: ClusterIP
+          port: 8000
+          grpcPort: 8001
+
+  # -- NV-Ingest dependency configuration
+  # subsection: nv-ingest
+  # NV-Ingest Service
+  nv-ingest:
+    enabled: true
+    imagePullSecrets:
+      - name: "ngc-secret"
+    ngcApiSecret:
+      create: false
+    ngcImagePullSecret:
+      create: false
+    image:
+      repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
+      tag: "26.1.2"
+    resources:
+      limits:
+        nvidia.com/gpu: 0
+    envVars:
+      ARROW_DEFAULT_MEMORY_POOL: "system"
+      OMP_NUM_THREADS: "1"
+      INGEST_LOG_LEVEL: WARNING
+      INGEST_RAY_LOG_LEVEL: "PRODUCTION"
+      INGEST_DYNAMIC_MEMORY_THRESHOLD: "0.80"
+      INGEST_DISABLE_DYNAMIC_SCALING: "True"
+      NV_INGEST_MAX_UTIL: 48
+      INGEST_EDGE_BUFFER_SIZE: 64
+      MRC_IGNORE_NUMA_CHECK: 1
+      READY_CHECK_ALL_COMPONENTS: "False"
+      REDIS_MORPHEUS_TASK_QUEUE: morpheus_task_queue
+      REDIS_INGEST_TASK_QUEUE: "ingest_task_queue"
+      NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
+      MAX_INGEST_PROCESS_WORKERS: 16
+      VLM_CAPTION_PROMPT: "Caption the content of this image"
+
+      # Ray internals configuration
+      RAY_num_grpc_threads: "1"
+      RAY_num_server_call_thread: "1"
+      RAY_worker_num_grpc_internal_threads: "1"
+
+      EMBEDDING_NIM_ENDPOINT: "http://nemotron-embedding-ms:8000/v1"
+      EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-nemotron-embed-1b-v2"
+      MESSAGE_CLIENT_HOST: "rag-redis-master"
+      MESSAGE_CLIENT_PORT: 6379
+      MESSAGE_CLIENT_TYPE: "redis"
+      MINIO_INTERNAL_ADDRESS: "rag-minio:9000"
+      MINIO_PUBLIC_ADDRESS: "http://localhost:9000"
+      MINIO_BUCKET: "nv-ingest"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MILVUS_ENDPOINT: "http://milvus:19530"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
+      MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
+      INSTALL_AUDIO_EXTRACTION_DEPS: "true"
+      COMPONENTS_TO_READY_CHECK: "ALL"
+
+      # OCR routing (defaults to NeMo Retriever OCR service)
+      OCR_GRPC_ENDPOINT: nemoretriever-ocr-v1:8001
+      OCR_HTTP_ENDPOINT: http://nemoretriever-ocr-v1:8000/v1/infer
+      OCR_INFER_PROTOCOL: grpc
+      OCR_MODEL_NAME: scene_text_ensemble
+
+      # NeMo Retriever Parse (VLM text extraction)
+      NEMOTRON_PARSE_HTTP_ENDPOINT: http://nemotron-parse:8000/v1/chat/completions
+      NEMOTRON_PARSE_INFER_PROTOCOL: http
+      NEMOTRON_PARSE_MODEL_NAME: nvidia/nemotron-parse
+
+      # PDF splitting configuration
+      PDF_SPLIT_PAGE_COUNT: "32"
+
+      # YOLOX endpoints
+      YOLOX_PAGE_IMAGE_FORMAT: "JPEG"
+      YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v3:8001
+      YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v3:8000/v1/infer
+      YOLOX_INFER_PROTOCOL: grpc
+      YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
+      YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer
+      YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: grpc
+      YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemoretriever-table-structure-v1:8001
+      YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
+      YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
+
+      # Captioning
+      VLM_CAPTION_MODEL_NAME: nvidia/nemotron-nano-12b-v2-vl
+      VLM_CAPTION_ENDPOINT: http://nim-vlm:8000/v1/chat/completions
+
+      # Audio service
+      AUDIO_GRPC_ENDPOINT: nv-ingest-riva-nim:50051
+      AUDIO_INFER_PROTOCOL: grpc
+
+    # Expose internal Milvus/MinIO config managed by nv-ingest subchart
+    milvusDeployed: true
+    milvus:
+      # Uncomment this section to enable authentication for Milvus
+      # extraConfigFiles:
+      #   user.yaml: |+
+      #     common:
+      #       security:
+      #         authorizationEnabled: true
+      #         defaultRootPassword: Milvus
+      image:
+        all:
+          repository: docker.io/milvusdb/milvus
+          tag: v2.6.5-gpu
+        tools:
+          repository: docker.io/milvusdb/milvus-config-tool
+          tag: v0.1.2
+          pullPolicy: IfNotPresent
+      etcd:
+        image:
+          repository: milvusdb/etcd
+          tag: "3.5.23-r2"
+      standalone:
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+      minio:
+        image:
+          repository: docker.io/minio/minio
+          tag: "RELEASE.2025-09-07T16-13-09Z"
+        accessKey: minioadmin
+        secretKey: minioadmin
+        bucketName: nv-ingest
+      fullnameOverride: milvus
+
+    # Redis Master
+    redis:
+      image:
+        repository: redis
+        tag: 8.2.1
+
+
+    # Ensure nv-ingest does not deploy its own observability components
+    otelDeployed: false
+    zipkinDeployed: false
+
+    nimOperator:
+      # Ensure nv-ingest does not deploy its own embedding NIM
+      embedqa:
+        enabled: false
+
+      # NeMo Retriever OCR (default)
+      # To use PaddleOCR instead, override the image:
+      # nemoretriever_ocr_v1:
+      #   enabled: true
+      #   image:
+      #     repository: nvcr.io/nim/baidu/paddleocr
+      #     tag: 1.5.0
+      # And set OCR_MODEL_NAME to "paddle" in envVars above
+      nemoretriever_ocr_v1:
+        enabled: true
+        storage:
+          pvc:
+            volumeAccessMode: "ReadWriteOnce"
+            storageClass: ""
+        tolerations: []
+        replicaCount: 1
+        image:
+          repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
+          tag: "1.2.1"
+        imagePullSecrets:
+          - name: ngc-secret
+        env:
+          - name: OMP_NUM_THREADS
+            value: "8"
+          - name: NIM_HTTP_API_PORT
+            value: "8000"
+          - name: NIM_TRITON_LOG_VERBOSE
+            value: "1"
+          - name: CUDA_VISIBLE_DEVICES
+            value: "0"
+          - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+            value: "8192"
+          - name: NIM_TRITON_MAX_BATCH_SIZE
+            value: "32"
+          - name: NIM_TRITON_ENABLE_MODEL_CONTROL
+            value: "1"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+
+      # NIM Graphic Elements
+      graphic_elements:
+        enabled: true
+        storage:
+          pvc:
+            volumeAccessMode: "ReadWriteOnce"
+            storageClass: ""
+        tolerations: []
+        replicaCount: 1
+        image:
+          repository: nvcr.io/nim/nvidia/nemotron-graphic-elements-v1
+          tag: "1.8.0"
+        env:
+          - name: NIM_HTTP_API_PORT
+            value: "8000"
+          - name: NIM_TRITON_LOG_VERBOSE
+            value: "1"
+          - name: NIM_TRITON_RATE_LIMIT
+            value: "3"
+          - name: CUDA_VISIBLE_DEVICES
+            value: "0"
+          - name: NIM_TRITON_MAX_BATCH_SIZE
+            value: "32"
+          - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+            value: "2048"
+          - name: OMP_NUM_THREADS
+            value: "1"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+
+      # NIM Page Elements
+      page_elements:
+        enabled: true
+        storage:
+          pvc:
+            volumeAccessMode: "ReadWriteOnce"
+            storageClass: ""
+        tolerations: []
+        replicaCount: 1
+        image:
+          repository: nvcr.io/nim/nvidia/nemotron-page-elements-v3
+          tag: "1.8.0"
+        env:
+          - name: NIM_HTTP_API_PORT
+            value: "8000"
+          - name: NIM_TRITON_LOG_VERBOSE
+            value: "1"
+          - name: NIM_TRITON_RATE_LIMIT
+            value: "3"
+          - name: CUDA_VISIBLE_DEVICES
+            value: "0"
+          - name: NIM_TRITON_MAX_BATCH_SIZE
+            value: "32"
+          - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+            value: "2048"
+          - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
+            value: "2"
+          - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
+            value: "1"
+          - name: OMP_NUM_THREADS
+            value: "2"
+          - name: NIM_ENABLE_OTEL
+            value: "true"
+          - name: NIM_OTEL_SERVICE_NAME
+            value: "page-elements"
+          - name: NIM_OTEL_TRACES_EXPORTER
+            value: "otlp"
+          - name: NIM_OTEL_METRICS_EXPORTER
+            value: "console"
+          - name: NIM_OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://otel-collector:4318"
+          - name: TRITON_OTEL_URL
+            value: "http://otel-collector:4318/v1/traces"
+          - name: TRITON_OTEL_RATE
+            value: "1"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+
+      # NIM Table Structure
+      table_structure:
+        enabled: true
+        storage:
+          pvc:
+            storageClass: ""
+            volumeAccessMode: "ReadWriteOnce"
+        tolerations: []
+        replicaCount: 1
+        image:
+          repository: nvcr.io/nim/nvidia/nemotron-table-structure-v1
+          tag: "1.8.0"
+        env:
+          - name: NIM_HTTP_API_PORT
+            value: "8000"
+          - name: NIM_TRITON_LOG_VERBOSE
+            value: "1"
+          - name: NIM_TRITON_RATE_LIMIT
+            value: "3"
+          - name: CUDA_VISIBLE_DEVICES
+            value: "0"
+          - name: NIM_TRITON_MAX_BATCH_SIZE
+            value: "32"
+          - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+            value: "2048"
+          - name: OMP_NUM_THREADS
+            value: "1"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+
+      # Nemotron Parse (VLM text extraction)
+      nemotron_parse:
+        enabled: false
+        storage:
+          pvc:
+            storageClass: ""
+            volumeAccessMode: "ReadWriteOnce"
+        nodeSelector: {}
+        tolerations: []
+        replicaCount: 1
+        image:
+          repository: nvcr.io/nim/nvidia/nemotron-parse
+          tag: "1.5.0"
+        env:
+          - name: NIM_HTTP_API_PORT
+            value: "8000"
+          - name: NIM_TRITON_LOG_VERBOSE
+            value: "1"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+
+      # Riva NIM for Audio Transcription
+      audio:
+        enabled: false
+        authSecret: ngc-api
+        storage:
+          pvc:
+            create: true
+            storageClass: ""
+            size: "25Gi"
+            volumeAccessMode: "ReadWriteOnce"
+        nodeSelector: {}
+        tolerations: []
+        replicas: 1
+        image:
+          repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
+          tag: "1.4.0"
+          pullSecrets:
+            - ngc-secret
+        env:
+          - name: NIM_TAGS_SELECTOR
+            value: "name=parakeet-1-1b-ctc-en-us,mode=ofl"
+          - name: NIM_TRITON_LOG_VERBOSE
+            value: "1"
+        expose:
+          service:
+            type: ClusterIP
+            name: http
+            port: 9000
+            grpcPort: 50051
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+
+
+# =============================================================================
+# --- nv-ingest ---
+# =============================================================================
+nv-ingest:
+  # Error fetching values for oci://dp.apps.rancher.io/charts/nv-ingest:
+  # {"message":"Failed to fetch helm values: Error: failed to perform \"FetchReference\" on source: GET \"https://dp.apps.rancher.io/v2/charts/nv-ingest/manifests/26.1.2\": response status code 401: Unauthorized\n"}
+
+
+# =============================================================================
+# --- Milvus ---
+# =============================================================================
+milvus:
+  Pulled: dp.apps.rancher.io/charts/milvus:5.0.19
+  Digest: sha256:464f0a3819e5ad4476435b22cbd798c78b42934ac5e732eb503807996ae26200
+  global:
+    # -- Global override for container image registry
+    imageRegistry: ""
+    # -- Global override for container image registry pull secrets
+    imagePullSecrets: []
+  ## Expand the name of the chart
+  nameOverride: ""
+  ## Default fully qualified app name
+  fullnameOverride: ""
+  ## Enable or disable Milvus Cluster mode
+  cluster:
+    enabled: true
+  ## Resource group isolation for multi-replica mode (cluster mode only).
+  ## List of resource group names (e.g., ["rg1", "rg2"]).
+  ## When set, creates per-RG querynode and streamingnode deployments,
+  ## and auto-configures cluster-level multi-replica settings.
+  replicaResourceGroups: []
+  image:
+    all:
+      repository: containers/milvus
+      tag: 2.6.15-5.1
+      pullPolicy: IfNotPresent
+      ## Optionally specify an array of imagePullSecrets.
+      ## Secrets must be manually created in the namespace.
+      ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+      ##
+      # pullSecrets:
+      #   - myRegistryKeySecretName
+
+      registry: dp.apps.rancher.io
+  # Global node selector
+  # If set, this will apply to all milvus components
+  # Individual components can be set to a different node selector
+  nodeSelector: {}
+  # Global tolerations
+  # If set, this will apply to all milvus components
+  # Individual components can be set to a different tolerations
+  tolerations: []
+  # Global affinity
+  # If set, this will apply to all milvus components
+  # Individual components can be set to a different affinity
+  affinity: {}
+  # Global securityContext
+  # If set, this will apply to all milvus components
+  # Individual components can be set to a different securityContext
+  containerSecurityContext: {}
+  securityContext: {}
+  # runAsUser: 1000
+  # runAsGroup: 1000
+  # fsGroup: 1000
+  # runAsNonRoot: true
+
+  # Global topologySpreadConstraints
+  # If set, this will apply to all milvus components
+  # Individual components can be set to different topologySpreadConstraints
+  # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+  topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: topology.kubernetes.io/zone
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       app.kubernetes.io/name: milvus
+
+  # Global labels and annotations
+  # If set, this will apply to all milvus components
+  labels: {}
+  annotations: {}
+  # Global Volumes & volumeMounts
+  # If set, this will apply to all milvus components
+  # ref: https://kubernetes.io/docs/concepts/storage/volumes/
+  volumes: []
+  volumeMounts: []
+  # Streaming node
+  # Default config for 2.6.0 or later.
+  streaming:
+    enabled: true
+    woodpecker:
+      embedded: true
+      storage:
+        type: minio
+  ##
+  ## If set, the whole config will be mounted from this custom ConfigMap.
+  ## The ConfigMap should have a key named `milvus.yaml` which contains the full Milvus config.
+  ## extraConfigFiles will be ignored if this variable is set.
+  ##
+  customConfigMap: ""
+  # Extra configs for milvus.yaml
+  # If set, this config will merge into milvus.yaml
+  # Please follow the config structure in the milvus.yaml
+  # at https://github.com/milvus-io/milvus/blob/master/configs/milvus.yaml
+  # Note: this config will be the top priority which will override the config
+  # in the image and helm chart.
+  extraConfigFiles:
+    user.yaml: |+
+      #    For example enable rest http for milvus proxy
+      #    proxy:
+      #      http:
+      #        enabled: true
+      #      maxUserNum: 100
+      #      maxRoleNum: 10
+      ##  Enable tlsMode and set the tls cert and key
+      #  tls:
+      #    serverPemPath: /etc/milvus/certs/tls.crt
+      #    serverKeyPath: /etc/milvus/certs/tls.key
+      #   common:
+      #     security:
+      #       tlsMode: 1
+
+  ## Expose the Milvus service to be accessed from outside the cluster (LoadBalancer service).
+  ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
+  ## ref: http://kubernetes.io/docs/user-guide/services/
+  ##
+  service:
+    type: ClusterIP
+    port: 19530
+    portName: milvus
+    nodePort: ""
+    annotations: {}
+    labels: {}
+    ## List of IP addresses at which the Milvus service is available
+    ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+    ##
+    externalIPs: []
+    #   - externalIp1
+
+    # LoadBalancerSourcesRange is a list of allowed CIDR values, which are combined with ServicePort to
+    # set allowed inbound rules on the security group assigned to the master load balancer
+    loadBalancerSourceRanges:
+      - 0.0.0.0/0
+      # Optionally assign a known public LB IP
+      # loadBalancerIP: 1.2.3.4
+  ingress:
+    enabled: false
+    ingressClassName: ""
+    annotations:
+      # Annotation example: set nginx ingress type
+      # kubernetes.io/ingress.class: nginx
+      nginx.ingress.kubernetes.io/backend-protocol: GRPC
+      nginx.ingress.kubernetes.io/listen-ports-ssl: '[19530]'
+      nginx.ingress.kubernetes.io/proxy-body-size: 4m
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    labels: {}
+    rules:
+      - host: "milvus-example.local"
+        path: "/"
+        pathType: "Prefix"
+        # - host: "milvus-example2.local"
+        #   path: "/otherpath"
+        #   pathType: "Prefix"
+    tls: []
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - milvus-example.local
+  serviceAccount:
+    create: false
+    name:
+    annotations:
+    labels:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      # Set this to `true` to create ServiceMonitor for Prometheus operator
+      enabled: false
+      interval: "30s"
+      scrapeTimeout: "10s"
+      # Additional labels that can be used so ServiceMonitor will be discovered by Prometheus
+      additionalLabels: {}
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 90
+    periodSeconds: 30
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 5
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 90
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 5
+  log:
+    level: "info"
+    file:
+      maxSize: 300 # MB
+      maxAge: 10 # day
+      maxBackups: 20
+    format: "text" # text/json
+    persistence:
+      mountPath: "/milvus/logs"
+      ## If true, create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: false
+      annotations:
+        helm.sh/resource-policy: keep
+      persistentVolumeClaim:
+        existingClaim: ""
+        ## Milvus Logs Persistent Volume Storage Class
+        ## If defined, storageClassName: <storageClass>
+        ## If set to "-", storageClassName: "", which disables dynamic provisioning
+        ## If undefined (the default) or set to null, no storageClassName spec is
+        ##   set, choosing the default provisioner.
+        ## ReadWriteMany access mode required for milvus cluster.
+        ##
+        storageClass:
+        accessModes: ReadWriteMany
+        size: 10Gi
+        subPath: ""
+  ## Heaptrack traces all memory allocations and annotates these events with stack traces.
+  ## See more: https://github.com/KDE/heaptrack
+  ## Enable heaptrack in production is not recommended.
+  heaptrack:
+    image:
+      repository: containers/heaptrack
+      tag: 1.3.0-5.1
+      pullPolicy: IfNotPresent
+      registry: dp.apps.rancher.io
+  standalone:
+    replicas: 1 # Run standalone mode with replication disabled
+    resources: {}
+    # Set local storage size in resources
+    # resources:
+    #   limits:
+    #     ephemeral-storage: 100Gi
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    disk:
+      enabled: true
+      size:
+        enabled: false # Enable local storage size limit
+    profiling:
+      enabled: false # Enable live profiling
+    ## Default message queue for milvus standalone
+    ## Supported value: rocksmq, natsmq, pulsar, kafka and woodpecker
+    messageQueue: woodpecker
+    persistence:
+      mountPath: "/var/lib/milvus"
+      ## If true, alertmanager will create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: true
+      annotations:
+        helm.sh/resource-policy: keep
+      persistentVolumeClaim:
+        existingClaim: ""
+        ## Milvus Persistent Volume Storage Class
+        ## If defined, storageClassName: <storageClass>
+        ## If set to "-", storageClassName: "", which disables dynamic provisioning
+        ## If undefined (the default) or set to null, no storageClassName spec is
+        ##   set, choosing the default provisioner.
+        ##
+        storageClass:
+        accessModes: ReadWriteOnce
+        size: 50Gi
+        subPath: ""
+  proxy:
+    enabled: true
+    # You can set the number of replicas to -1 to remove the replicas field in case you want to use HPA
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    http:
+      enabled: true # whether to enable http rest server
+      debugMode:
+        enabled: false
+    # Mount a TLS secret into proxy pod
+    tls:
+      enabled: false
+      ## when enabling proxy.tls, all items below should be uncommented and the key and crt values should be populated.
+      #    enabled: true
+      #    secretName: milvus-tls
+      ## expecting base64 encoded values here: i.e. $(cat tls.crt | base64 -w 0) and $(cat tls.key | base64 -w 0)
+      #    key: LS0tLS1CRUdJTiBQU--REDUCT
+      #    crt: LS0tLS1CRUdJTiBDR--REDUCT
+      #  volumes:
+      #  - secret:
+      #      secretName: milvus-tls
+      #    name: milvus-tls
+      #  volumeMounts:
+      #  - mountPath: /etc/milvus/certs/
+      #    name: milvus-tls
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      cpuUtilization: 40
+  rootCoordinator:
+    enabled: false
+    # You can set the number of replicas greater than 1, only if enable active standby
+    replicas: 1 # Run Root Coordinator mode with replication disabled
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    activeStandby:
+      enabled: false # Enable active-standby when you set multiple replicas for root coordinator
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    service:
+      port: 53100
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+  queryCoordinator:
+    enabled: false
+    # You can set the number of replicas greater than 1, only if enable active standby
+    replicas: 1 # Run Query Coordinator mode with replication disabled
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    activeStandby:
+      enabled: false # Enable active-standby when you set multiple replicas for query coordinator
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    service:
+      port: 19531
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+  queryNode:
+    enabled: true
+    # You can set the number of replicas to -1 to remove the replicas field in case you want to use HPA
+    replicas: 1
+    resources: {}
+    # Set local storage size in resources
+    # resources:
+    #   limits:
+    #     ephemeral-storage: 100Gi
+    # Set below when using other runtimes than default like nvidia for example
+    runtimeClassName: ""
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    disk:
+      enabled: true # Enable querynode load disk index, and search on disk index
+      size:
+        enabled: false # Enable local storage size limit
+    profiling:
+      enabled: false # Enable live profiling
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      cpuUtilization: 40
+      memoryUtilization: 60
+  indexCoordinator:
+    enabled: false
+    # You can set the number of replicas greater than 1, only if enable active standby
+    replicas: 1 # Run Index Coordinator mode with replication disabled
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    activeStandby:
+      enabled: false # Enable active-standby when you set multiple replicas for index coordinator
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    service:
+      port: 31000
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+  indexNode:
+    enabled: false
+    # You can set the number of replicas to -1 to remove the replicas field in case you want to use HPA
+    replicas: 1
+    resources: {}
+    # Set local storage size in resources
+    # limits:
+    #    ephemeral-storage: 100Gi
+    # Set below when using other runtimes than default like nvidia for example
+    runtimeClassName: ""
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    disk:
+      enabled: true # Enable index node build disk vector index
+      size:
+        enabled: false # Enable local storage size limit
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      cpuUtilization: 40
+  dataCoordinator:
+    enabled: false
+    # You can set the number of replicas greater than 1, only if enable active standby
+    replicas: 1 # Run Data Coordinator mode with replication disabled
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    activeStandby:
+      enabled: false # Enable active-standby when you set multiple replicas for data coordinator
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    service:
+      port: 13333
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+  dataNode:
+    enabled: true
+    # You can set the number of replicas to -1 to remove the replicas field in case you want to use HPA
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      cpuUtilization: 40
+  ## mixCoordinator contains all coord
+  ## If you want to use mixcoord, enable this and disable all of other coords
+  mixCoordinator:
+    enabled: true
+    # You can set the number of replicas greater than 1, only if enable active standby
+    replicas: 1 # Run Mixture Coordinator mode with replication disabled
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    activeStandby:
+      enabled: false # Enable active-standby when you set multiple replicas for Mixture coordinator
+    # Deployment strategy, default is RollingUpdate
+    # Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment
+    strategy: {}
+    annotations: {}
+    service:
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+  streamingNode:
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    strategy: {}
+  cdc:
+    enabled: false
+    replicas: 1 # Currently, CDC only supports one replica
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    securityContext: {}
+    containerSecurityContext: {}
+    topologySpreadConstraints: [] # Component specific topologySpreadConstraints
+    extraEnv: []
+    heaptrack:
+      enabled: false
+    profiling:
+      enabled: false # Enable live profiling
+    strategy: {}
+    annotations: {}
+  ###################################
+  # External S3
+  # - these configs are only used when `externalS3.enabled` is true
+  ###################################
+  externalS3:
+    enabled: false
+    host: ""
+    port: ""
+    accessKey: ""
+    secretKey: ""
+    useSSL: false
+    bucketName: ""
+    rootPath: ""
+    useIAM: false
+    cloudProvider: "aws"
+    iamEndpoint: ""
+    region: ""
+    useVirtualHost: false
+  ###################################
+  # GCS Gateway
+  # - these configs are only used when `minio.gcsgateway.enabled` is true
+  ###################################
+  externalGcs:
+    bucketName: ""
+  ###################################
+  # External etcd
+  # - these configs are only used when `externalEtcd.enabled` is true
+  ###################################
+  externalEtcd:
+    enabled: false
+    ## the endpoints of the external etcd
+    ##
+    endpoints:
+      - localhost:2379
+  ###################################
+  # External pulsar
+  # - these configs are only used when `externalPulsar.enabled` is true
+  ###################################
+  externalPulsar:
+    enabled: false
+    host: localhost
+    port: 6650
+    maxMessageSize: "5242880" # 5 * 1024 * 1024 Bytes, Maximum size of each message in pulsar.
+    tenant: public
+    namespace: default
+    authPlugin: ""
+    authParams: ""
+  ###################################
+  # External kafka
+  # - these configs are only used when `externalKafka.enabled` is true
+  # - note that the following are just examples, you should confirm the
+  #   value of brokerList and mechanisms according to the actual external
+  #   Kafka configuration. E.g. If you select the AWS MSK, the configuration
+  #   should look something like this:
+  #   externalKafka:
+  #     enabled: true
+  #     brokerList: "xxxx:9096"
+  #     securityProtocol: SASL_SSL
+  #     sasl:
+  #       mechanisms: SCRAM-SHA-512
+  #       password: "xxx"
+  #       username: "xxx"
+  ###################################
+  externalKafka:
+    enabled: false
+    brokerList: localhost:9092
+    securityProtocol: SASL_SSL
+    sasl:
+      mechanisms: PLAIN
+      username: ""
+      password: ""
+  ## Configuration values for the etcd dependency
+  ## ref: https://artifacthub.io/packages/helm/bitnami/etcd
+  ##
+  etcd:
+    enabled: true
+    name: etcd
+    replicaCount: 3
+    containerPorts:
+      client: 2379
+      peer: 2380
+    service:
+      enabled: true
+      annotations: {}
+      type: ClusterIP
+      nodePorts:
+        client: "2379"
+        peer: "2380"
+      ports:
+        client: "2379"
+        peer: "2380"
+    auth:
+      rbac:
+        enabled: false
+    persistence:
+      enabled: true
+      storageClassName:
+      accessModes:
+        - ReadWriteOnce
+  ## Configuration values for the kafka dependency
+  ## ref: https://apps.rancher.io/applications/apache-kafka
+  ##
+  kafka:
+    enabled: true
+    name: kafka
+    broker:
+      enabled: true
+    cluster:
+      nodeCount:
+        broker: 3
+        controller: 3
+      listeners:
+        client:
+          protocol: 'PLAINTEXT'
+        controller:
+          protocol: 'PLAINTEXT'
+  ## Configuration values for the minio dependency
+  ## ref: https://github.com/zilliztech/milvus-helm/blob/master/charts/minio/README.md
+  ##
+  minio:
+    enabled: true
+    name: minio
+    replicas: 4
+    service:
+      port: "9000"
+    tls:
+      enabled: false
+    users:
+      - accessKey: minioadmin
+        secretKey: minioadmin
+        existingSecret: ""
+        policy: consoleAdmin
+    bucketName: "milvus-bucket"
+    rootPath: file
+    useIAM: false
+    iamEndpoint: ""
+    region: ""
+    useVirtualHost: false
+    resources:
+      requests:
+        memory: 2Gi
+
+
+# =============================================================================
+# --- OpenTelemetry Collector ---
+# =============================================================================
+opentelemetry-collector:
+  Pulled: dp.apps.rancher.io/charts/opentelemetry-collector:0.153.0
+  Digest: sha256:3fd74d8921eb64edcb2b308a9127c2293da5ff5d01d0fee880268de2d7f1198e
+  # Default values for opentelemetry-collector.
+  # This is a YAML-formatted file.
+  # Declare variables to be passed into your templates.
+
+  global:
+    # -- Global override for container image registry
+    imageRegistry: ""
+    # -- Global override for container image registry pull secrets
+    imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  # Valid values are "daemonset", "deployment", and "statefulset".
+  mode: ""
+  # Override the default apiVersion for custom controllers or for testing new API versions.
+  apiVersion: "apps/v1"
+  # Specify which namespace should be used to deploy the resources into
+  namespaceOverride: ""
+  # Handles basic configuration of components that
+  # also require k8s modifications to work correctly.
+  # .Values.config can be used to modify/add to a preset
+  # component configuration, but CANNOT be used to remove
+  # preset configuration. If you require removal of any
+  # sections of a preset configuration, you cannot use
+  # the preset. Instead, configure the component manually in
+  # .Values.config and use the other fields supplied in the
+  # values.yaml to configure k8s as necessary.
+  presets:
+    # Configures the collector to collect logs.
+    # Adds the filelog receiver to the logs pipeline
+    # and adds the necessary volumes and volume mounts.
+    # Best used with mode = daemonset.
+    # See https://opentelemetry.io/docs/kubernetes/collector/components/#filelog-receiver for details on the receiver.
+    logsCollection:
+      enabled: false
+      includeCollectorLogs: false
+      # Enabling this writes checkpoints in /var/lib/otelcol/ host directory.
+      # Note this changes collector's user to root, so that it can write to host directory.
+      storeCheckpoints: false
+      # The maximum bytes size of the recombined field.
+      # Once the size exceeds the limit, all received entries of the source will be combined and flushed.
+      maxRecombineLogSize: 102400
+    # Configures the collector to collect host metrics.
+    # Adds the hostmetrics receiver to the metrics pipeline
+    # and adds the necessary volumes and volume mounts.
+    # Best used with mode = daemonset.
+    # See https://opentelemetry.io/docs/kubernetes/collector/components/#host-metrics-receiver for details on the receiver.
+    hostMetrics:
+      enabled: false
+    # Configures the Kubernetes Processor to add Kubernetes metadata.
+    # Adds the k8sattributes processor to all the pipelines
+    # and adds a preset of minimum required RBAC rules to ClusterRole.
+    # Best used with mode = daemonset.
+    # See https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-attributes-processor for details on the receiver.
+    kubernetesAttributes:
+      enabled: false
+      # When enabled the processor will extract all labels for an associated pod and add them as resource attributes.
+      # The label's exact name will be the key.
+      extractAllPodLabels: false
+      # When enabled the processor will extract all annotations for an associated pod and add them as resource attributes.
+      # The annotation's exact name will be the key.
+      extractAllPodAnnotations: false
+    # Configures the collector to collect node, pod, and container metrics from the API server on a kubelet.
+    # Adds the kubeletstats receiver to the metrics pipeline
+    # and adds the necessary rules to ClusterRole.
+    # Best used with mode = daemonset.
+    # See https://opentelemetry.io/docs/kubernetes/collector/components/#kubeletstats-receiver for details on the receiver.
+    kubeletMetrics:
+      enabled: false
+    # Configures the collector to collect kubernetes events.
+    # Adds the k8sobjects receiver to the logs pipeline
+    # and collects kubernetes events by default.
+    # Best used with mode = deployment or statefulset.
+    # See https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-objects-receiver for details on the receiver.
+    kubernetesEvents:
+      enabled: false
+    # Configures the Kubernetes Cluster Receiver to collect cluster-level metrics.
+    # Adds the k8s_cluster receiver to the metrics pipeline
+    # and adds the necessary rules to ClusterRole.
+    # Can be used with mode = deployment, statefulset, or daemonset.
+    # When used as a daemonset, a leader election is setup to prevent duplication
+    # See https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-cluster-receiver for details on the receiver.
+    clusterMetrics:
+      enabled: false
+      # When enabled with mode = daemonset, leader election is setup to prevent telemetry duplication.
+      # disableLeaderElection: false
+    # Configures the collector to collect logs and metrics from pods with specific annotations.
+    # This preset can not be used together with the `logsCollection` preset.
+    # Adds the receiver_creator receiver to the logs and metrics pipelines
+    # and adds the necessary rules to ClusterRole.
+    # Best used with mode = daemonset.
+    # See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/receivercreator/README.md#generate-receiver-configurations-from-provided-hints for details on the receiver.
+    annotationDiscovery:
+      logs:
+        enabled: false
+      metrics:
+        enabled: false
+    # Configures the collector to collect profiling data.
+    # Adds profiles pipeline with the profiling receiver,
+    # and adds the necessary volumes, security context and host PID access.
+    #
+    # Warning: The profiling receiver requires privileged access and hostPID,
+    # so it should be used with a dedicated collector distribution (e.g. otelcol-ebpf-profiler)
+    # rather than the general-purpose k8s distribution. This avoids granting elevated privileges
+    # to the same collector that handles metrics, traces, and logs.
+    # See https://github.com/open-telemetry/opentelemetry-collector-releases/tree/main/distributions/otelcol-ebpf-profiler for more details.
+    profiling:
+      enabled: false
+  configMap:
+    # Specifies whether a configMap should be created (true by default)
+    create: true
+    # Specifies an existing ConfigMap to be mounted to the pod
+    # The ConfigMap MUST include the collector configuration via a key named 'relay' or the collector will not start.
+    # This also supports template content, which will eventually be converted to yaml.
+    existingName: ""
+    # Specifies the relative path to custom ConfigMap template file. This option SHOULD be used when bundling a custom
+    # ConfigMap template, as it enables pod restart via a template checksum annotation.
+    # existingPath: ""
+  # When enabled, the chart will configure the collector to emit its traces, metrics, and logs over http via the OTLP using the Otel Go SDK.
+  # If internalTelemetryViaOTLP.metrics.enabled the chart will remove the default prometheus receiver (which was configured to scrape the Collector's metrics)
+  # and the service.telemetry.metrics.address value.
+  # Learn more about the Collector telemetry at https://opentelemetry.io/docs/collector/internal-telemetry/.
+  #
+  # THIS OPTION IS EXPERIMENTAL AND SUBJECT TO BREAKING CHANGES
+  internalTelemetryViaOTLP:
+    # The endpoint where the telemetry will be exported
+    endpoint: ""
+    # Optional headers to configure the exporters
+    headers: []
+    # - name: "x-dest-auth"
+    #   value: "some auth key"
+    traces:
+      enabled: false
+      # overrides internalTelemetryViaOTLP.endpoint for traces
+      endpoint: ""
+      # overrides internalTelemetryViaOTLP.headers for traces
+      headers: []
+    metrics:
+      enabled: false
+      # overrides internalTelemetryViaOTLP.endpoint for metrics
+      endpoint: ""
+      # overrides internalTelemetryViaOTLP.headers for metrics
+      headers: []
+    logs:
+      enabled: false
+      # overrides internalTelemetryViaOTLP.endpoint for logs
+      endpoint: ""
+      # overrides internalTelemetryViaOTLP.headers for logs
+      headers: []
+  # Base collector configuration.
+  # Supports templating. To escape existing instances of {{ }}, use {{` <original content> `}}.
+  # For example, {{ REDACTED_EMAIL }} becomes {{` {{ REDACTED_EMAIL }} `}}.
+  config:
+    exporters:
+      debug: {}
+    extensions:
+      # The health_check extension is mandatory for this chart.
+      # Without the health_check extension the collector will fail the readiness and liveness probes.
+      # The health_check extension can be modified, but should never be removed.
+      health_check:
+        endpoint: ${env:MY_POD_IP}:13133
+    processors:
+      batch: {}
+      # Default memory limiter configuration for the collector based on k8s resource limits.
+      memory_limiter:
+        # check_interval is the time between measurements of memory usage.
+        check_interval: 5s
+        # By default limit_mib is set to 80% of ".Values.resources.limits.memory"
+        limit_percentage: 80
+        # By default spike_limit_mib is set to 25% of ".Values.resources.limits.memory"
+        spike_limit_percentage: 25
+    receivers:
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: ${env:MY_POD_IP}:14250
+          thrift_http:
+            endpoint: ${env:MY_POD_IP}:14268
+          thrift_compact:
+            endpoint: ${env:MY_POD_IP}:6831
+      otlp:
+        protocols:
+          grpc:
+            endpoint: ${env:MY_POD_IP}:4317
+          http:
+            endpoint: ${env:MY_POD_IP}:4318
+      # if internalTelemetryViaOTLP.metrics.enabled = true, prometheus receiver will be removed
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: opentelemetry-collector
+              scrape_interval: 10s
+              static_configs:
+                - targets:
+                    - ${env:MY_POD_IP}:8888
+      zipkin:
+        endpoint: ${env:MY_POD_IP}:9411
+    service:
+      telemetry:
+        resource:
+          k8s.namespace.name: "${env:OTEL_K8S_NAMESPACE}"
+          k8s.node.name: "${env:OTEL_K8S_NODE_NAME}"
+          k8s.node.ip: "${env:OTEL_K8S_NODE_IP}"
+          k8s.pod.name: "${env:OTEL_K8S_POD_NAME}"
+          k8s.pod.ip: "${env:OTEL_K8S_POD_IP}"
+          host.name: "${env:OTEL_K8S_NODE_NAME}"
+        metrics:
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: ${env:MY_POD_IP}
+                    port: 8888
+      extensions:
+        - health_check
+      pipelines:
+        logs:
+          exporters:
+            - debug
+          processors:
+            - memory_limiter
+            - batch
+          receivers:
+            - otlp
+        metrics:
+          exporters:
+            - debug
+          processors:
+            - memory_limiter
+            - batch
+          receivers:
+            - otlp
+            # if internalTelemetryViaOTLP.metrics.enabled = true, prometheus receiver will be removed
+            - prometheus
+        traces:
+          exporters:
+            - debug
+          processors:
+            - memory_limiter
+            - batch
+          receivers:
+            - otlp
+            - jaeger
+            - zipkin
+  # Helm currently has an issue (https://github.com/helm/helm/pull/12879) when using null to remove
+  # default configuration from a subchart. The result is that you cannot remove default configuration
+  # from `config`, such as a specific receiver or a specific pipeline, when the chart is used as a
+  # subchart.
+  #
+  # Until the helm bug is fixed, this field is provided as an alternative when using this chart as a subchart.
+  # It is not recommended to use this field when installing the chart directly.
+  #
+  # When not empty, `alternateConfig` will be used to set the collector's configuration. It has NO default
+  # values and IS NOT MERGED with config. Any configuration provided via `config` will be ignored when
+  # `alternateConfig` is set. You MUST provide your own collector configuration.
+  #
+  # Reminder that the healthcheck extension (or something else that provides the same functionality) is required.
+  #
+  # Components configured by presets will be injected in the same way they are for `config`.
+  alternateConfig: {}
+  image:
+    repository: "containers/opentelemetry-collector"
+    pullPolicy: IfNotPresent
+    # Replace the tag with the desired OpenTelemetry Collector version and distribution:
+    #   * "0.151.0" (OpenTelemetry Collector Core Distro)
+    #   * "0.151.0-k8s" (OpenTelemetry Collector Kubernetes Distro)
+    tag: "0.151.0-k8s-9.2"
+    # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
+    digest: ""
+    registry: dp.apps.rancher.io
+  imagePullSecrets: []
+  # OpenTelemetry Collector executable
+  command:
+    name: ""
+    extraArgs: []
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: ""
+    # Automatically mount a ServiceAccount's API credentials?
+    automountServiceAccountToken: true
+  clusterRole:
+    # Specifies whether a clusterRole should be created
+    # Some presets also trigger the creation of a cluster role and cluster role binding.
+    # If using one of those presets, this field is no-op.
+    create: false
+    # Annotations to add to the clusterRole
+    # Can be used in combination with presets that create a cluster role.
+    annotations: {}
+    # The name of the clusterRole to use.
+    # If not set a name is generated using the fullname template
+    # Can be used in combination with presets that create a cluster role.
+    name: ""
+    # A set of rules as documented here : https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+    # Can be used in combination with presets that create a cluster role to add additional rules.
+    rules: []
+    # - apiGroups:
+    #   - ''
+    #   resources:
+    #   - 'pods'
+    #   - 'nodes'
+    #   verbs:
+    #   - 'get'
+    #   - 'list'
+    #   - 'watch'
+
+    clusterRoleBinding:
+      # Annotations to add to the clusterRoleBinding
+      # Can be used in combination with presets that create a cluster role binding.
+      annotations: {}
+      # The name of the clusterRoleBinding to use.
+      # If not set a name is generated using the fullname template
+      # Can be used in combination with presets that create a cluster role binding.
+      name: ""
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  # Allows for pod scheduler prioritisation
+  priorityClassName: ""
+  # Allows for pod to use a specific runtime class, e.g. gvisor, kata-containers
+  # Also useful for the pod security admissions plugins that rely on runtimeClassName
+  runtimeClassName: ""
+  terminationGracePeriodSeconds: 30
+  extraEnvs: []
+  extraEnvsFrom: []
+  # This also supports template content, which will eventually be converted to yaml.
+  extraVolumes: []
+  # This also supports template content, which will eventually be converted to yaml.
+  extraVolumeMounts: []
+  # This also supports template content, which will eventually be converted to yaml.
+  extraManifests: []
+  # Configuration for ports
+  # nodePort is also allowed
+  ports:
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      hostPort: 4317
+      protocol: TCP
+      # nodePort: 30317
+      appProtocol: grpc
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      hostPort: 4318
+      protocol: TCP
+    jaeger-compact:
+      enabled: true
+      containerPort: 6831
+      servicePort: 6831
+      hostPort: 6831
+      protocol: UDP
+    jaeger-thrift:
+      enabled: true
+      containerPort: 14268
+      servicePort: 14268
+      hostPort: 14268
+      protocol: TCP
+    jaeger-grpc:
+      enabled: true
+      containerPort: 14250
+      servicePort: 14250
+      hostPort: 14250
+      protocol: TCP
+    zipkin:
+      enabled: true
+      containerPort: 9411
+      servicePort: 9411
+      hostPort: 9411
+      protocol: TCP
+    metrics:
+      # The metrics port is disabled by default. However you need to enable the port
+      # in order to use the ServiceMonitor (serviceMonitor.enabled) or PodMonitor (podMonitor.enabled).
+      enabled: false
+      containerPort: 8888
+      servicePort: 8888
+      protocol: TCP
+  # When enabled, the chart will set the GOMEMLIMIT env var to 80% of the configured resources.limits.memory.
+  # If no resources.limits.memory are defined then enabling does nothing.
+  # It is HIGHLY recommend to enable this setting and set a value for resources.limits.memory.
+  useGOMEMLIMIT: true
+  # Resource limits & requests.
+  # It is HIGHLY recommended to set resource limits.
+  resources: {}
+  # resources:
+  #   limits:
+  #     cpu: 250m
+  #     memory: 512Mi
+
+  enableConfigChecksumAnnotation: true
+  podAnnotations: {}
+  podLabels: {}
+  # Common labels to add to all otel-collector resources. Evaluated as a template.
+  additionalLabels: {}
+  #  app.kubernetes.io/part-of: my-app
+
+  # Host networking requested for this pod. Use the host's network namespace.
+  hostNetwork: false
+  # Enable sharing the host's PID namespace with the pod.
+  # WARNING: This grants visibility into all host processes and should only be enabled when required.
+  hostPID: false
+  # Adding entries to Pod /etc/hosts with HostAliases
+  # https://kubernetes.io/docs/tasks/network/customize-hosts-file-for-pods/
+  hostAliases: []
+  # - ip: "1.2.3.4"
+  #   hostnames:
+  #     - "my.host.com"
+
+  # Pod DNS policy ClusterFirst, ClusterFirstWithHostNet, None, Default, None
+  dnsPolicy: ""
+  # Custom DNS config. Required when DNS policy is None.
+  dnsConfig: {}
+  # Custom kube scheduler name.
+  schedulerName: ""
+  # only used with deployment mode
+  replicaCount: 1
+  revisionHistoryLimit: 10
+  annotations: {}
+  # List of extra sidecars to add.
+  # This also supports template content, which will eventually be converted to yaml.
+  extraContainers: []
+  # extraContainers:
+  #   - name: test
+  #     command:
+  #       - cp
+  #     args:
+  #       - /bin/sleep
+  #       - /test/sleep
+  #     image: busybox:latest
+  #     volumeMounts:
+  #       - name: test
+  #         mountPath: /test
+
+  # List of init container specs, e.g. for copying a binary to be executed as a lifecycle hook.
+  # This also supports template content, which will eventually be converted to yaml.
+  # Another usage of init containers is e.g. initializing filesystem permissions to the OTLP Collector user `1000` in case you are using persistence and the volume is producing a permission denied error for the OTLP Collector container.
+  initContainers: []
+  # initContainers:
+  #   - name: test
+  #     image: busybox:latest
+  #     command:
+  #       - cp
+  #     args:
+  #       - /bin/sleep
+  #       - /test/sleep
+  #     volumeMounts:
+  #       - name: test
+  #         mountPath: /test
+  #  - name: init-fs
+  #    image: busybox:latest
+  #    command:
+  #      - sh
+  #      - '-c'
+  #      - 'chown -R 1000: /var/lib/storage/otc' # use the path given as per `extensions.file_storage.directory` & `extraVolumeMounts[x].mountPath`
+  #    volumeMounts:
+  #      - name: opentelemetry-collector-data # use the name of the volume used for persistence
+  #        mountPath: /var/lib/storage/otc # use the path given as per `extensions.file_storage.directory` & `extraVolumeMounts[x].mountPath`
+
+  # Pod lifecycle policies.
+  lifecycleHooks: {}
+  # lifecycleHooks:
+  #   preStop:
+  #     exec:
+  #       command:
+  #       - /test/sleep
+  #       - "5"
+
+  # liveness probe configuration
+  # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+  ##
+  livenessProbe:
+    # Number of seconds after the container has started before startup, liveness or readiness probes are initiated.
+    # initialDelaySeconds: 1
+    # How often in seconds to perform the probe.
+    # periodSeconds: 10
+    # Number of seconds after which the probe times out.
+    # timeoutSeconds: 1
+    # Minimum consecutive failures for the probe to be considered failed after having succeeded.
+    # failureThreshold: 1
+    # Duration in seconds the pod needs to terminate gracefully upon probe failure.
+    # terminationGracePeriodSeconds: 10
+    httpGet:
+      port: 13133
+      path: /
+  # readiness probe configuration
+  # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+  ##
+  readinessProbe:
+    # Number of seconds after the container has started before startup, liveness or readiness probes are initiated.
+    # initialDelaySeconds: 1
+    # How often (in seconds) to perform the probe.
+    # periodSeconds: 10
+    # Number of seconds after which the probe times out.
+    # timeoutSeconds: 1
+    # Minimum consecutive successes for the probe to be considered successful after having failed.
+    # successThreshold: 1
+    # Minimum consecutive failures for the probe to be considered failed after having succeeded.
+    # failureThreshold: 1
+    httpGet:
+      port: 13133
+      path: /
+  # startup probe configuration
+  # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+  ##
+  startupProbe: {}
+  # Number of seconds after the container has started before startup probes are initiated.
+  # initialDelaySeconds: 1
+  # How often in seconds to perform the probe.
+  # periodSeconds: 10
+  # Number of seconds after which the probe times out.
+  # timeoutSeconds: 1
+  # Minimum consecutive failures for the probe to be considered failed after having succeeded.
+  # failureThreshold: 1
+  # Duration in seconds the pod needs to terminate gracefully upon probe failure.
+  # terminationGracePeriodSeconds: 10
+  # httpGet:
+  #   port: 13133
+  #   path: /
+
+  service:
+    # Enable the creation of a Service.
+    # By default, it's enabled on mode != daemonset.
+    # However, to enable it on mode = daemonset, its creation must be explicitly enabled
+    # enabled: true
+    type: ClusterIP
+    # Supported values: PreferClose (deprecated in K8s 1.33+), PreferSameZone, PreferSameNode
+    # trafficDistribution: PreferClose
+    # type: LoadBalancer
+    # loadBalancerIP: 1.2.3.4
+    # loadBalancerSourceRanges: []
+
+    # By default, Service of type 'LoadBalancer' will be created setting 'externalTrafficPolicy: Cluster'
+    # unless other value is explicitly set.
+    # Possible values are Cluster or Local (https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip)
+    # externalTrafficPolicy: Cluster
+    annotations: {}
+    # By default, Service will be created setting 'internalTrafficPolicy: Local' on mode = daemonset
+    # unless other value is explicitly set.
+    # Setting 'internalTrafficPolicy: Cluster' on a daemonset is not recommended
+    # internalTrafficPolicy: Cluster
+  ingress:
+    enabled: false
+    # annotations: {}
+    # ingressClassName: nginx
+    # hosts:
+    #   - host: collector.example.com
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         port: 4318
+    # tls:
+    #   - secretName: collector-tls
+    #     hosts:
+    #       - collector.example.com
+
+    # Additional ingresses - only created if ingress.enabled is true
+    # Useful for when differently annotated ingress services are required
+    # Each additional ingress needs key "name" set to something unique
+    additionalIngresses: []
+    # - name: cloudwatch
+    #   ingressClassName: nginx
+    #   annotations: {}
+    #   hosts:
+    #     - host: collector.example.com
+    #       paths:
+    #         - path: /
+    #           pathType: Prefix
+    #           port: 4318
+    #   tls:
+    #     - secretName: collector-tls
+    #       hosts:
+    #         - collector.example.com
+  podMonitor:
+    # The pod monitor by default scrapes the metrics port.
+    # The metrics port needs to be enabled as well.
+    enabled: false
+    metricsEndpoints:
+      - port: metrics
+        # interval: 15s
+    # additional labels for the PodMonitor
+    extraLabels: {}
+    #   release: kube-prometheus-stack
+  serviceMonitor:
+    # The service monitor by default scrapes the metrics port.
+    # The metrics port needs to be enabled as well.
+    enabled: false
+    metricsEndpoints:
+      - port: metrics
+        # interval: 15s
+    # additional labels for the ServiceMonitor
+    extraLabels: {}
+    #  release: kube-prometheus-stack
+    # Used to set relabeling and metricRelabeling configs on the ServiceMonitor
+    # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
+    relabelings: []
+    metricRelabelings: []
+  # PodDisruptionBudget is used only if mode is "deployment" or "statefulset"
+  podDisruptionBudget:
+    enabled: false
+  #   minAvailable: 2
+  #   maxUnavailable: 1
+
+  # autoscaling is used only if mode is "deployment" or "statefulset"
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    behavior: {}
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # Supply an array of custom metrics to be used for autoscaling. It includes externalMetrics, objectMetrics, and podsMetrics.
+    additionalMetrics: []
+  rollout:
+    rollingUpdate: {}
+    # When 'mode: daemonset', maxSurge cannot be used when hostPort is set for any of the ports
+    # maxSurge: 25%
+    # maxUnavailable: 0
+    strategy: RollingUpdate
+  prometheusRule:
+    enabled: false
+    groups: []
+    # Create default rules for monitoring the collector
+    defaultRules:
+      enabled: false
+      ## Additional labels for PrometheusRule alerts
+      additionalRuleLabels: {}
+      ## Additional annotations for PrometheusRule alerts
+      additionalRuleAnnotations: {}
+    # additional labels for the PrometheusRule
+    extraLabels: {}
+  statefulset:
+    # volumeClaimTemplates for a statefulset
+    volumeClaimTemplates: []
+    podManagementPolicy: "Parallel"
+    # Controls if and how PVCs created by the StatefulSet are deleted. Available in Kubernetes 1.23+.
+    persistentVolumeClaimRetentionPolicy:
+      enabled: false
+      whenDeleted: Retain
+      whenScaled: Retain
+  networkPolicy:
+    enabled: false
+    # Annotations to add to the NetworkPolicy
+    annotations: {}
+    # Configure the 'from' clause of the NetworkPolicy.
+    # By default this will restrict traffic to ports enabled for the Collector. If
+    # you wish to further restrict traffic to other hosts or specific namespaces,
+    # see the standard NetworkPolicy 'spec.ingress.from' definition for more info:
+    # https://kubernetes.io/docs/reference/kubernetes-api/policy-resources/network-policy-v1/
+    allowIngressFrom: []
+    # # Allow traffic from any pod in any namespace, but not external hosts
+    # - namespaceSelector: {}
+    # # Allow external access from a specific cidr block
+    # - ipBlock:
+    #     cidr: 192.168.1.64/32
+    # # Allow access from pods in specific namespaces
+    # - namespaceSelector:
+    #     matchExpressions:
+    #       - key: kubernetes.io/metadata.name
+    #         operator: In
+    #         values:
+    #           - "cats"
+    #           - "dogs"
+
+    # Add additional ingress rules to specific ports
+    # Useful to allow external hosts/services to access specific ports
+    # An example is allowing an external prometheus server to scrape metrics
+    #
+    # See the standard NetworkPolicy 'spec.ingress' definition for more info:
+    # https://kubernetes.io/docs/reference/kubernetes-api/policy-resources/network-policy-v1/
+    extraIngressRules: []
+    # - ports:
+    #   - port: metrics
+    #     protocol: TCP
+    #   from:
+    #     - ipBlock:
+    #         cidr: 192.168.1.64/32
+
+    # Restrict egress traffic from the OpenTelemetry collector pod
+    # See the standard NetworkPolicy 'spec.egress' definition for more info:
+    # https://kubernetes.io/docs/reference/kubernetes-api/policy-resources/network-policy-v1/
+    egressRules: []
+    #  - to:
+    #      - namespaceSelector: {}
+    #      - ipBlock:
+    #          cidr: 192.168.10.10/24
+    #    ports:
+    #      - port: 1234
+    #        protocol: TCP
+  # Allow containers to share processes across pod namespace
+  shareProcessNamespace: false
