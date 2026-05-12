@@ -1,0 +1,47 @@
+apiVersion: suse.ai/v1alpha1
+kind: Blueprint
+metadata:
+  name: "nvidia-blueprint-rag"
+  labels:
+    catalog.suse.ai/support: "opensource"
+    catalog.suse.ai/tier: "certified"
+    catalog.suse.ai/certified: "false"
+    catalog.suse.ai/status: "new"
+  mantainer: "alessandro.festa1@suse.com"
+  source: "https://github.com/oxenhamltd/bundles"
+spec:
+  displayName: "nvidia-blueprint-rag"
+  description: "An end to end Helm chart for the NVIDIA RAG Blueprint"
+  category: "Inference"
+  source:
+    git:
+      url: "https://github.com/oxenhamltd/bundles"
+      ref: "main"
+      path: "nvidia-blueprint-rag/v2.5.0/chart"
+  modules:
+    - moduleRef: "apache-airflow"
+      displayName: "Apache Airflow"
+      description: "Apache Airflow is an open-source platform for programmatically authoring, scheduling, and monitoring complex workflows, primarily used for data pipelines, but also for other automated tasks like infrastructure management."
+      category: "dataIngestion"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/apache-airflow"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "nvidia-blueprint-rag"
+      dependsOn:
+        - "nv-ingest"
+    - moduleRef: "opentelemetry-collector"
+      displayName: "OpenTelemetry Collector"
+      description: "The OpenTelemetry Collector offers a vendor-agnostic implementation on how to receive, process and export telemetry data. In addition, it removes the need to run, operate and maintain multiple agents/collectors in order to support open-source telemetry data formats (e.g. Jaeger, Prometheus, etc.) to multiple open-source or commercial back-ends."
+      category: "applicationUI"
+      support: "SUSE"
+      source:
+        helm:
+          url: "oci://dp.apps.rancher.io/charts/opentelemetry-collector"
+          ref: ">0.0.0-0"
+          path: ""
+      targetNamespace: "nvidia-blueprint-rag"
+      dependsOn:
+        - "nv-ingest"
