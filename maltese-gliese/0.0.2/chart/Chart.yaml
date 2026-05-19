@@ -1,0 +1,24 @@
+apiVersion: v2
+name: "maltese-gliese"
+description: "A simple description"
+version: "0.0.2"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "maltese-gliese"
+  blueprint.suse.ai/version: "0.0.2"
+  blueprint.suse.ai/last-edit: "2026-05-19T14:26:54Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "postgresql"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: postgresql.enabled
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
+  - name: "open-webui"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: open-webui.enabled
