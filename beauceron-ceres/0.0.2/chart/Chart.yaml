@@ -1,0 +1,24 @@
+apiVersion: v2
+name: "beauceron-ceres"
+description: "descrizione"
+version: "0.0.2"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "beauceron-ceres"
+  blueprint.suse.ai/version: "0.0.2"
+  blueprint.suse.ai/last-edit: "2026-06-10T13:21:59Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "opensearch"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: opensearch.enabled
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
+  - name: "open-webui"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: open-webui.enabled
