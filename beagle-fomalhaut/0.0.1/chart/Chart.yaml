@@ -1,0 +1,16 @@
+apiVersion: v2
+name: "beagle-fomalhaut"
+description: ""
+version: "0.0.1"
+appVersion: "1.0"
+type: application
+annotations:
+  blueprint.suse.ai/name: "beagle-fomalhaut"
+  blueprint.suse.ai/version: "0.0.1"
+  blueprint.suse.ai/last-edit: "2026-06-10T10:16:57Z"
+  blueprint.suse.ai/authors: "alessandro.festa1@suse.com"
+dependencies:
+  - name: "ollama"
+    version: ">0.0.0-0"
+    repository: "oci://dp.apps.rancher.io/charts"
+    condition: ollama.enabled
