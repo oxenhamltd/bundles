@@ -1,0 +1,37 @@
+{
+  "apiVersion": "fleet.cattle.io/v1alpha1",
+  "kind": "HelmOp",
+  "metadata": {
+    "name": "my-simple-chatbot-ollama",
+    "namespace": "fleet-local"
+  },
+  "spec": {
+    "defaultNamespace": "my-simple-chatbot-system",
+    "helm": {
+      "disablePreProcess": true,
+      "releaseName": "my-simple-chatbot-ollama",
+      "repo": "oci://dp.apps.rancher.io/charts/ollama",
+      "values": {
+        "global": {
+          "imagePullSecrets": [
+            {
+              "name": "suse-ai-pull-combined"
+            }
+          ]
+        },
+        "imagePullSecrets": [
+          {
+            "name": "suse-ai-pull-combined"
+          }
+        ]
+      },
+      "version": "1.55.0"
+    },
+    "helmSecretName": "application-collection-auth",
+    "targets": [
+      {
+        "clusterName": "local"
+      }
+    ]
+  }
+}
